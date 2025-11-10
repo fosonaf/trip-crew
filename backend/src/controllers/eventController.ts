@@ -123,8 +123,8 @@ export const getEventById = async (req: Request, res: Response): Promise<void> =
     const event = eventResult.rows[0];
 
     const membersResult = await pool.query(
-      `SELECT em.id, em.role, em.payment_status, em.qr_code, 
-              u.id as user_id, u.first_name, u.last_name, u.email
+      `SELECT em.id, em.role, em.payment_status,
+              u.id as user_id, u.first_name, u.last_name, u.email, u.phone, u.avatar_url
        FROM event_members em
        JOIN users u ON em.user_id = u.id
        WHERE em.event_id = $1`,
@@ -156,9 +156,10 @@ export const getEventById = async (req: Request, res: Response): Promise<void> =
         firstName: m.first_name,
         lastName: m.last_name,
         email: m.email,
+        phone: m.phone,
         role: m.role,
         paymentStatus: m.payment_status,
-        qrCode: m.qr_code,
+        avatarUrl: m.avatar_url,
       })),
       steps: stepsResult.rows.map(s => ({
         id: s.id,

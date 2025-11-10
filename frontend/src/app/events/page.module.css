@@ -4,6 +4,7 @@
   display: flex;
   flex-direction: column;
   gap: 24px;
+  align-items: center;
 }
 
 .card {
@@ -16,13 +17,11 @@
     0 28px 60px rgba(2, 6, 23, 0.5),
     0 12px 30px rgba(37, 99, 235, 0.12);
   color: var(--text-primary);
+  margin: 0 auto;
 }
 
 .header {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
+  display: grid;
   gap: 16px;
 }
 
@@ -65,9 +64,10 @@
 
 .actions {
   margin-top: 36px;
-  display: flex;
+  display: inline-flex;
   gap: 12px;
   flex-wrap: wrap;
+  justify-content: center;
 }
 
 .button {
@@ -107,6 +107,163 @@
   transform: translateY(-1px);
   background-color: rgba(15, 23, 42, 0.35);
   box-shadow: 0 16px 26px rgba(15, 23, 42, 0.4);
+}
+
+.sectionHeader {
+  display: grid;
+  gap: 16px;
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.sectionSubtitle {
+  margin: 6px 0 0;
+  color: var(--text-secondary);
+  line-height: 1.7;
+}
+
+.card.eventsCard {
+  position: relative;
+  padding-top: 60px;
+}
+
+.counter {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.32);
+  background-color: rgba(15, 23, 42, 0.45);
+  font-weight: 600;
+}
+
+.error {
+  margin-top: 24px;
+  padding: 14px 18px;
+  border-radius: 14px;
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  background-color: rgba(248, 113, 113, 0.12);
+  color: var(--danger);
+  font-weight: 500;
+}
+
+.placeholder {
+  margin: 18px 0 0;
+  color: var(--text-secondary);
+}
+
+.empty {
+  margin-top: 24px;
+  padding: 26px;
+  border-radius: 18px;
+  border: 1px dashed rgba(148, 163, 184, 0.35);
+  background-color: rgba(15, 23, 42, 0.25);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-items: center;
+  text-align: center;
+}
+
+.eventList {
+  margin-top: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.eventCard {
+  text-decoration: none;
+  color: inherit;
+  padding: 22px 24px;
+  border-radius: 18px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  background-color: rgba(15, 23, 42, 0.35);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.eventCard:hover {
+  border-color: rgba(59, 130, 246, 0.4);
+  box-shadow: 0 16px 28px rgba(37, 99, 235, 0.25);
+}
+
+.eventHeader {
+  display: grid;
+  justify-items: flex-start;
+  gap: 12px;
+}
+
+.eventTitle {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.roleBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(59, 130, 246, 0.4);
+  background-color: rgba(59, 130, 246, 0.2);
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+}
+
+.roleDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(59, 130, 246, 1);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.35);
+}
+
+.eventDescription {
+  margin: 0;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  max-width: 60ch;
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+}
+
+.meta div {
+  display: grid;
+  gap: 4px;
+  min-width: 180px;
+}
+
+.meta dt {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(148, 163, 184, 0.8);
+}
+
+.meta dd {
+  margin: 0;
+  font-weight: 600;
+  color: var(--text-primary);
 }
 
 @media (max-width: 640px) {

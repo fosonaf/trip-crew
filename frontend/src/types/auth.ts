@@ -3,7 +3,8 @@ export type User = {
   email: string;
   firstName: string;
   lastName: string;
-  phone?: string | null;
+  phone: string | null;
+  avatarUrl: string | null;
 };
 
 export type AuthResponse = {

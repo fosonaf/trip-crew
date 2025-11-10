@@ -1,4 +1,12 @@
-import type { AuthResponse } from "@/types/auth";
+import type { AuthResponse, User } from "@/types/auth";
+import type {
+  CreateEventPayload,
+  Event,
+  EventDetail,
+  EventSummary,
+  CreateStepPayload,
+  EventStep,
+} from "@/types/event";
 import { loadToken } from "./storage";
 
 const API_BASE_URL =
@@ -68,13 +76,40 @@ export const authApi = {
     password: string;
     firstName: string;
     lastName: string;
-    phone?: string;
+    phone: string;
+    avatarUrl?: string | null;
   }) =>
     apiFetch<AuthResponse>("/api/auth/register", {
       method: "POST",
       body: JSON.stringify(payload),
       auth: false,
     }),
-  profile: () => apiFetch<{ user: AuthResponse["user"] }>("/api/auth/profile"),
+  profile: () => apiFetch<{ user: User }>("/api/auth/profile"),
+  updateProfile: (payload: {
+    email?: string;
+    firstName?: string;
+    lastName?: string;
+    phone?: string;
+    avatarUrl?: string | null;
+  }) =>
+    apiFetch<{ user: User }>("/api/auth/profile", {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    }),
+};
+
+export const eventApi = {
+  create: (payload: CreateEventPayload) =>
+    apiFetch<Event>("/api/events", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  list: () => apiFetch<EventSummary[]>("/api/events"),
+  detail: (eventId: string) => apiFetch<EventDetail>(`/api/events/${eventId}`),
+  createStep: (eventId: string, payload: CreateStepPayload) =>
+    apiFetch<EventStep>(`/api/events/${eventId}/steps`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
 };
 

@@ -31,13 +31,19 @@ export default function RegisterPage() {
     setError(null);
     setIsSubmitting(true);
 
+    if (!form.phone.trim()) {
+      setError("Le numéro de téléphone est obligatoire.");
+      setIsSubmitting(false);
+      return;
+    }
+
     try {
       const payload = {
         email: form.email,
         password: form.password,
         firstName: form.firstName,
         lastName: form.lastName,
-        phone: form.phone.trim() || undefined,
+        phone: form.phone.trim(),
       };
 
       const result = await authApi.register(payload);
@@ -108,7 +114,7 @@ export default function RegisterPage() {
         </label>
 
         <label className={styles.label}>
-          Téléphone (optionnel)
+          Téléphone
           <input
             className={styles.input}
             type="tel"
@@ -116,6 +122,7 @@ export default function RegisterPage() {
             onChange={handleChange("phone")}
             placeholder="+33600000000"
             autoComplete="tel"
+            required
           />
         </label>
 

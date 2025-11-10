@@ -22,7 +22,7 @@ export const authenticate = async (
     }
 
     const result = await pool.query(
-      'SELECT id, email, first_name, last_name FROM users WHERE id = $1',
+      'SELECT id, email, first_name, last_name, phone, avatar_url FROM users WHERE id = $1',
       [decoded.userId]
     );
 
