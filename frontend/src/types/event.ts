@@ -61,6 +61,13 @@ export type EventJoinRequest = {
   requestedAt: string;
 };
 
+export type OutgoingJoinRequest = {
+  id: number;
+  eventId: number;
+  eventName: string;
+  requestedAt: string;
+};
+
 export type EventStep = {
   id: number;
   name: string;

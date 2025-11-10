@@ -7,6 +7,8 @@ import {
   getMemberQRCode,
   inviteMember,
   listPendingInvitations,
+  listUserJoinRequests,
+  cancelJoinRequest,
   acceptInvitation,
   declineInvitation,
   removePendingInvitation,
@@ -21,6 +23,8 @@ import { authenticate, isEventOrganizer } from '../middleware/auth';
 const router = express.Router();
 
 router.get('/invitations/pending', authenticate, listPendingInvitations);
+router.get('/requests/pending', authenticate, listUserJoinRequests);
+router.delete('/requests/:requestId', authenticate, cancelJoinRequest);
 router.post('/invitations/:memberId/accept', authenticate, acceptInvitation);
 router.post('/invitations/:memberId/decline', authenticate, declineInvitation);
 router.post('/:eventId/invitations', authenticate, isEventOrganizer, inviteMember);

@@ -8,6 +8,7 @@ import type {
   EventStep,
   PendingInvitation,
   EventJoinRequest,
+  OutgoingJoinRequest,
   EventMember,
 } from "@/types/event";
 import { loadToken } from "./storage";
@@ -153,6 +154,11 @@ export const eventApi = {
 
 export const invitationApi = {
   pending: () => apiFetch<PendingInvitation[]>("/api/events/invitations/pending"),
+  requests: () => apiFetch<OutgoingJoinRequest[]>("/api/events/requests/pending"),
+  cancelRequest: (requestId: number) =>
+    apiFetch<{ message: string }>(`/api/events/requests/${requestId}`, {
+      method: "DELETE",
+    }),
   accept: (memberId: number) =>
     apiFetch<{ message: string; eventId: number }>(`/api/events/invitations/${memberId}/accept`, {
       method: "POST",

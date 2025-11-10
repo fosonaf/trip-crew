@@ -407,6 +407,78 @@ export const listEventJoinRequests = async (req: Request, res: Response): Promis
   }
 };
 
+export const listUserJoinRequests = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+
+    if (!userId) {
+      res.status(401).json({ error: 'Not authenticated' });
+      return;
+    }
+
+    const requests = await prisma.eventJoinRequest.findMany({
+      where: {
+        userId,
+        status: 'pending',
+      },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        event: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+    });
+
+    res.json(
+      requests.map((request) => ({
+        id: request.id,
+        eventId: request.event.id,
+        eventName: request.event.name,
+        requestedAt: request.createdAt.toISOString(),
+      })),
+    );
+  } catch (error) {
+    console.error('List user join requests error:', error);
+    res.status(500).json({ error: 'Failed to list join requests' });
+  }
+};
+
+export const cancelJoinRequest = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    const { requestId } = req.params;
+
+    if (!userId) {
+      res.status(401).json({ error: 'Not authenticated' });
+      return;
+    }
+
+    const updated = await prisma.eventJoinRequest.updateMany({
+      where: {
+        id: Number(requestId),
+        userId,
+        status: 'pending',
+      },
+      data: {
+        status: 'cancelled',
+      },
+    });
+
+    if (updated.count === 0) {
+      res.status(404).json({ error: 'Demande introuvable ou déjà traitée.' });
+      return;
+    }
+
+    res.json({ message: 'Demande annulée.' });
+  } catch (error) {
+    console.error('Cancel join request error:', error);
+    res.status(500).json({ error: 'Failed to cancel join request' });
+  }
+};
+
 export const acceptJoinRequest = async (req: Request, res: Response): Promise<void> => {
   try {
     const { eventId, requestId } = req.params;

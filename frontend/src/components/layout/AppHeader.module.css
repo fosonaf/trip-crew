@@ -152,6 +152,66 @@
   gap: 10px;
 }
 
+.requestList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.requestItem {
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  background: rgba(15, 23, 42, 0.35);
+  display: grid;
+  gap: 8px;
+}
+
+.requestMeta {
+  display: grid;
+  gap: 4px;
+}
+
+.requestName {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.requestDate {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.requestActions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.requestCancelButton {
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(248, 113, 113, 0.45);
+  background-color: rgba(248, 113, 113, 0.2);
+  color: rgba(248, 113, 113, 1);
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 150ms ease, box-shadow 150ms ease, opacity 120ms ease;
+}
+
+.requestCancelButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.requestCancelButton:not(:disabled):hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 24px rgba(248, 113, 113, 0.18);
+}
+
 .invitationItem {
   display: grid;
   gap: 8px;

@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuthContext } from "@/components/providers/AuthProvider";
 import { invitationApi } from "@/lib/api";
-import type { PendingInvitation } from "@/types/event";
+import type { OutgoingJoinRequest, PendingInvitation } from "@/types/event";
 import styles from "./AppHeader.module.css";
 
 const computeInitials = (firstName?: string | null, lastName?: string | null) => {
@@ -22,6 +22,10 @@ export function AppHeader() {
 
   const [invitations, setInvitations] = useState<PendingInvitation[]>([]);
   const [isLoadingInvitations, setIsLoadingInvitations] = useState(false);
+  const [joinRequests, setJoinRequests] = useState<OutgoingJoinRequest[]>([]);
+  const [isLoadingJoinRequests, setIsLoadingJoinRequests] = useState(false);
+  const [joinRequestError, setJoinRequestError] = useState<string | null>(null);
+  const [activeRequestAction, setActiveRequestAction] = useState<number | null>(null);
   const [invitationError, setInvitationError] = useState<string | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [activeInvitationAction, setActiveInvitationAction] = useState<{ memberId: number; type: "accept" | "decline" } | null>(null);
@@ -33,6 +37,7 @@ export function AppHeader() {
 
   const initials = useMemo(() => computeInitials(user?.firstName, user?.lastName), [user]);
   const pendingCount = invitations.length;
+  const requestsCount = joinRequests.length;
 
   const fetchInvitations = useCallback(async () => {
     if (!token) {
@@ -51,12 +56,30 @@ export function AppHeader() {
     }
   }, [token]);
 
-useEffect(() => {
-  if (shouldHide) {
-    return;
-  }
-  fetchInvitations();
-}, [shouldHide, fetchInvitations]);
+  const fetchJoinRequests = useCallback(async () => {
+    if (!token) {
+      return;
+    }
+    setIsLoadingJoinRequests(true);
+    setJoinRequestError(null);
+    try {
+      const data = await invitationApi.requests();
+      setJoinRequests(data);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Impossible de récupérer les demandes.";
+      setJoinRequestError(message);
+    } finally {
+      setIsLoadingJoinRequests(false);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    if (shouldHide) {
+      return;
+    }
+    fetchInvitations();
+    fetchJoinRequests();
+  }, [shouldHide, fetchInvitations, fetchJoinRequests]);
 
   const handleLogout = () => {
     logout();
@@ -67,7 +90,8 @@ useEffect(() => {
     setIsMenuOpen((prev) => !prev);
     if (!isMenuOpen) {
       setInvitationError(null);
-      fetchInvitations();
+      void fetchInvitations();
+      void fetchJoinRequests();
     }
   };
 
@@ -99,6 +123,20 @@ useEffect(() => {
       setInvitationError(message);
     } finally {
       setActiveInvitationAction(null);
+    }
+  };
+
+  const handleCancelJoinRequest = async (requestId: number) => {
+    try {
+      setActiveRequestAction(requestId);
+      await invitationApi.cancelRequest(requestId);
+      setJoinRequests((prev) => prev.filter((request) => request.id !== requestId));
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Impossible d’annuler la demande pour le moment.";
+      setJoinRequestError(message);
+    } finally {
+      setActiveRequestAction(null);
     }
   };
 
@@ -151,8 +189,10 @@ if (shouldHide) {
             aria-haspopup="true"
             aria-expanded={isMenuOpen}
           >
-            Invitations
-            {pendingCount > 0 ? <span className={styles.badge}>{pendingCount}</span> : null}
+            Notifications
+            {pendingCount + requestsCount > 0 ? (
+              <span className={styles.badge}>{pendingCount + requestsCount}</span>
+            ) : null}
           </button>
           {isMenuOpen ? (
             <div className={styles.dropdown} role="menu">
@@ -205,6 +245,50 @@ if (shouldHide) {
                           activeInvitationAction?.type === "decline"
                             ? "…"
                             : "✕"}
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              <div className={styles.dropdownHeader}>
+                <h3>Demandes envoyées</h3>
+                <span className={styles.dropdownHint}>
+                  {requestsCount > 0
+                    ? `${requestsCount} demande${requestsCount > 1 ? "s" : ""} en attente`
+                    : "Aucune demande en attente"}
+                </span>
+              </div>
+              {joinRequestError ? (
+                <div className={styles.dropdownError}>{joinRequestError}</div>
+              ) : null}
+              {isLoadingJoinRequests ? (
+                <p className={styles.dropdownPlaceholder}>Chargement des demandes…</p>
+              ) : joinRequests.length === 0 ? (
+                <p className={styles.dropdownPlaceholder}>Pas de demande à afficher.</p>
+              ) : (
+                <ul className={styles.requestList}>
+                  {joinRequests.map((request) => (
+                    <li key={request.id} className={styles.requestItem}>
+                      <div className={styles.requestMeta}>
+                        <span className={styles.requestName}>{request.eventName}</span>
+                        <span className={styles.requestDate}>
+                          Envoyée le{" "}
+                          {new Intl.DateTimeFormat("fr-FR", {
+                            dateStyle: "medium",
+                            timeStyle: "short",
+                          }).format(new Date(request.requestedAt))}
+                        </span>
+                      </div>
+                      <div className={styles.requestActions}>
+                        <button
+                          type="button"
+                          className={styles.requestCancelButton}
+                          onClick={() => handleCancelJoinRequest(request.id)}
+                          disabled={activeRequestAction === request.id}
+                        >
+                          {activeRequestAction === request.id ? "Annulation…" : "Annuler"}
                         </button>
                       </div>
                     </li>
