@@ -76,6 +76,9 @@ useEffect(() => {
       setActiveInvitationAction({ memberId, type: "accept" });
       await invitationApi.accept(memberId);
       setInvitations((prev) => prev.filter((invitation) => invitation.memberId !== memberId));
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("tripcrew:invitationAccepted"));
+      }
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Impossible d’accepter l’invitation pour le moment.";

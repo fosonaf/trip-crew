@@ -25,6 +25,16 @@
   gap: 16px;
 }
 
+.feedback {
+  margin: 12px 0 0;
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(34, 197, 94, 0.45);
+  background-color: rgba(34, 197, 94, 0.15);
+  color: rgba(34, 197, 94, 1);
+  font-weight: 600;
+}
+
 .title {
   margin: 0;
   font-size: clamp(2.15rem, 4vw, 2.9rem);
@@ -193,15 +203,58 @@
   gap: 18px;
 }
 
+.eventCardLink {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  text-decoration: none;
+  color: inherit;
+}
+
 .eventCard:hover {
   border-color: rgba(59, 130, 246, 0.4);
   box-shadow: 0 16px 28px rgba(37, 99, 235, 0.25);
+}
+
+.eventCardFooter {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.leaveButton {
+  padding: 10px 18px;
+  border-radius: 999px;
+  border: 1px solid rgba(248, 113, 113, 0.45);
+  background-color: rgba(248, 113, 113, 0.18);
+  color: rgba(248, 113, 113, 1);
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 150ms ease, box-shadow 150ms ease;
+}
+
+.leaveButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  border-color: rgba(148, 163, 184, 0.35);
+  background-color: rgba(148, 163, 184, 0.18);
+  color: var(--text-secondary);
+}
+
+.leaveButton:not(:disabled):hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 24px rgba(248, 113, 113, 0.25);
 }
 
 .eventHeader {
   display: grid;
   justify-items: flex-start;
   gap: 12px;
+}
+
+.eventHeaderBadges {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .eventTitle {

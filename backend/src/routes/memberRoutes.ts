@@ -1,5 +1,4 @@
 import express from 'express';
-import express from 'express';
 import { 
   joinEvent, 
   updateMemberRole, 
@@ -10,6 +9,8 @@ import {
   listPendingInvitations,
   acceptInvitation,
   declineInvitation,
+  removePendingInvitation,
+  leaveEvent,
 } from '../controllers/memberController';
 import { authenticate, isEventOrganizer } from '../middleware/auth';
 
@@ -20,9 +21,11 @@ router.post('/invitations/:memberId/accept', authenticate, acceptInvitation);
 router.post('/invitations/:memberId/decline', authenticate, declineInvitation);
 router.post('/:eventId/invitations', authenticate, isEventOrganizer, inviteMember);
 router.post('/:eventId/join', authenticate, joinEvent);
+router.delete('/:eventId/leave', authenticate, leaveEvent);
 router.get('/:eventId/qrcode', authenticate, getMemberQRCode);
 router.put('/:eventId/members/:memberId/role', authenticate, isEventOrganizer, updateMemberRole);
 router.put('/:eventId/members/:memberId/payment', authenticate, isEventOrganizer, updatePaymentStatus);
 router.delete('/:eventId/members/:memberId', authenticate, isEventOrganizer, removeMember);
+router.delete('/:eventId/invitations/:memberId', authenticate, isEventOrganizer, removePendingInvitation);
 
 export default router;

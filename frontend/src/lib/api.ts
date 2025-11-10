@@ -117,6 +117,18 @@ export const eventApi = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
+  leave: (eventId: string) =>
+    apiFetch<{ message: string }>(`/api/events/${eventId}/leave`, {
+      method: "DELETE",
+    }),
+  removeMember: (eventId: string, memberId: number) =>
+    apiFetch<{ message: string }>(`/api/events/${eventId}/members/${memberId}`, {
+      method: "DELETE",
+    }),
+  removeInvitation: (eventId: string, memberId: number) =>
+    apiFetch<{ message: string }>(`/api/events/${eventId}/invitations/${memberId}`, {
+      method: "DELETE",
+    }),
 };
 
 export const invitationApi = {

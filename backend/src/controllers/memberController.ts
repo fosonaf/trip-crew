@@ -90,10 +90,40 @@ export const updatePaymentStatus = async (req: Request, res: Response): Promise<
 export const removeMember = async (req: Request, res: Response): Promise<void> => {
   try {
     const { eventId, memberId } = req.params;
-    await pool.query(
-      'DELETE FROM event_members WHERE id = $1 AND event_id = $2',
+    const membershipResult = await pool.query(
+      `SELECT role, status FROM event_members WHERE id = $1 AND event_id = $2`,
       [memberId, eventId]
     );
+
+    if (membershipResult.rows.length === 0) {
+      res.status(404).json({ error: 'Member not found' });
+      return;
+    }
+
+    const membership = membershipResult.rows[0];
+
+    if (membership.status === 'pending') {
+      await pool.query('DELETE FROM event_members WHERE id = $1', [memberId]);
+      res.json({ message: 'Invitation removed successfully' });
+      return;
+    }
+
+    if (membership.role === 'organizer') {
+      const organizerCountResult = await pool.query(
+        `SELECT COUNT(*) FROM event_members 
+         WHERE event_id = $1 AND role = 'organizer' AND status = 'active'`,
+        [eventId]
+      );
+
+      const organizerCount = Number(organizerCountResult.rows[0].count ?? 0);
+      if (organizerCount <= 1) {
+        res.status(400).json({ error: 'Impossible de retirer le dernier organisateur.' });
+        return;
+      }
+    }
+
+    await pool.query('DELETE FROM event_members WHERE id = $1', [memberId]);
+
     res.json({ message: 'Member removed successfully' });
   } catch (error) {
     console.error('Remove member error:', error);
@@ -354,4 +384,72 @@ const updateMemberQRCode = async (memberId: number, eventId: number, userId: num
     'UPDATE event_members SET qr_code = $1 WHERE id = $2',
     [updatedQrCode, memberId]
   );
+};
+
+export const removePendingInvitation = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { eventId, memberId } = req.params;
+
+    const result = await pool.query(
+      `DELETE FROM event_members 
+       WHERE id = $1 AND event_id = $2 AND status = 'pending'`,
+      [memberId, eventId]
+    );
+
+    if (result.rowCount === 0) {
+      res.status(404).json({ error: 'Pending invitation not found' });
+      return;
+    }
+
+    res.json({ message: 'Invitation removed successfully' });
+  } catch (error) {
+    console.error('Remove invitation error:', error);
+    res.status(500).json({ error: 'Failed to remove invitation' });
+  }
+};
+
+export const leaveEvent = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { eventId } = req.params;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      res.status(401).json({ error: 'Not authenticated' });
+      return;
+    }
+
+    const membershipResult = await pool.query(
+      `SELECT id, role FROM event_members 
+       WHERE event_id = $1 AND user_id = $2 AND status = 'active'`,
+      [eventId, userId]
+    );
+
+    if (membershipResult.rows.length === 0) {
+      res.status(404).json({ error: 'Membership not found' });
+      return;
+    }
+
+    const membership = membershipResult.rows[0];
+
+    if (membership.role === 'organizer') {
+      const organizerCountResult = await pool.query(
+        `SELECT COUNT(*) FROM event_members 
+         WHERE event_id = $1 AND role = 'organizer' AND status = 'active'`,
+        [eventId]
+      );
+
+      const organizerCount = Number(organizerCountResult.rows[0].count ?? 0);
+      if (organizerCount <= 1) {
+        res.status(400).json({ error: 'Impossible de quitter : tu es le dernier organisateur.' });
+        return;
+      }
+    }
+
+    await pool.query('DELETE FROM event_members WHERE id = $1', [membership.id]);
+
+    res.json({ message: 'Event left successfully' });
+  } catch (error) {
+    console.error('Leave event error:', error);
+    res.status(500).json({ error: 'Failed to leave event' });
+  }
 };

@@ -37,6 +37,30 @@
   flex-wrap: wrap;
 }
 
+.leaveAction {
+  padding: 10px 18px;
+  border-radius: 999px;
+  border: 1px solid rgba(248, 113, 113, 0.45);
+  background-color: rgba(248, 113, 113, 0.18);
+  color: rgba(248, 113, 113, 1);
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 150ms ease, box-shadow 150ms ease;
+}
+
+.leaveAction:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  border-color: rgba(148, 163, 184, 0.35);
+  background-color: rgba(148, 163, 184, 0.18);
+  color: var(--text-secondary);
+}
+
+.leaveAction:not(:disabled):hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 24px rgba(248, 113, 113, 0.25);
+}
+
 .primaryAction {
   padding: 12px 24px;
   border-radius: 999px;
@@ -194,6 +218,14 @@
   gap: 12px;
 }
 
+.memberHeaderActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 .memberName {
   margin: 0;
   font-size: 1.1rem;
@@ -220,6 +252,22 @@
   font-size: 0.85rem;
   font-weight: 600;
   color: var(--text-secondary);
+}
+
+.memberRemoveButton {
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(248, 113, 113, 0.45);
+  background-color: rgba(248, 113, 113, 0.18);
+  color: rgba(248, 113, 113, 1);
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 150ms ease, box-shadow 150ms ease;
+}
+
+.memberRemoveButton:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 24px rgba(248, 113, 113, 0.25);
 }
 
 .memberEmail {

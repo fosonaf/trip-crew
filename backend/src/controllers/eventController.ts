@@ -64,7 +64,14 @@ export const getEvents = async (req: Request, res: Response): Promise<void> => {
     const userId = req.user?.id;
 
     const result = await pool.query(
-      `SELECT DISTINCT e.*, em.role, em.payment_status, em.status
+      `SELECT DISTINCT e.*, em.role, em.payment_status, em.status, em.id AS member_id,
+              (
+                SELECT COUNT(*) 
+                FROM event_members em2 
+                WHERE em2.event_id = e.id 
+                  AND em2.role = 'organizer' 
+                  AND em2.status = 'active'
+              ) AS organizer_count
        FROM events e
        INNER JOIN event_members em ON e.id = em.event_id
        WHERE em.user_id = $1 AND em.status = 'active'
@@ -73,7 +80,7 @@ export const getEvents = async (req: Request, res: Response): Promise<void> => {
     );
 
     const events = result.rows.map(row => ({
-      id: row.id,
+      id: Number(row.id),
       name: row.name,
       description: row.description,
       startDate: row.start_date,
@@ -84,6 +91,8 @@ export const getEvents = async (req: Request, res: Response): Promise<void> => {
       role: row.role,
       paymentStatus: row.payment_status,
       status: row.status,
+      memberId: Number(row.member_id),
+      organizerCount: Number(row.organizer_count ?? 0),
     }));
 
     res.json(events);

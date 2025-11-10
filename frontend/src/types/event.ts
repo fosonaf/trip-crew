@@ -32,6 +32,8 @@ export type EventSummary = {
   role: string;
   paymentStatus: string | null;
   status?: string;
+  memberId: number;
+  organizerCount: number;
 };
 
 export type EventMember = {

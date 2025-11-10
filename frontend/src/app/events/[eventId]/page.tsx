@@ -57,6 +57,7 @@ export default function EventDetailPage() {
   const [isSendingInvitation, setIsSendingInvitation] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [invitePhone, setInvitePhone] = useState("");
+  const [isLeaving, setIsLeaving] = useState(false);
   const [stepForm, setStepForm] = useState({
     name: "",
     description: "",
@@ -113,10 +114,37 @@ export default function EventDetailPage() {
     return `${event.createdBy.firstName} ${event.createdBy.lastName}`.trim();
   }, [event]);
 
-  const isOrganizer = useMemo(() => {
-    if (!event || !user) return false;
-    return event.members.some((member) => member.userId === user.id && member.role === "organizer");
+  const currentMember = useMemo(() => {
+    if (!event || !user) return null;
+    return event.members.find((member) => member.userId === user.id) ?? null;
   }, [event, user]);
+
+  const activeOrganizerCount = useMemo(() => {
+    if (!event) return 0;
+    return event.members.filter(
+      (member) => member.role === "organizer" && member.status === "active",
+    ).length;
+  }, [event]);
+
+  const isOrganizer = currentMember?.role === "organizer";
+
+  const canLeaveEvent = useMemo(() => {
+    if (!currentMember) return false;
+    if (currentMember.status !== "active") {
+      return false;
+    }
+    if (currentMember.role === "organizer" && activeOrganizerCount <= 1) {
+      return false;
+    }
+    return true;
+  }, [currentMember, activeOrganizerCount]);
+
+  const leaveButtonLabel = useMemo(() => {
+    if (currentMember?.role === "organizer" && activeOrganizerCount <= 1) {
+      return "Dernier organisateur";
+    }
+    return isLeaving ? "Départ..." : "Quitter l’évènement";
+  }, [currentMember, activeOrganizerCount, isLeaving]);
 
   const handleStepFieldChange = (
     evt: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>,
@@ -253,6 +281,77 @@ export default function EventDetailPage() {
     }
   };
 
+  const handleRemoveMember = async (memberId: number) => {
+    try {
+      await eventApi.removeMember(eventId, memberId);
+      setEvent((prev) =>
+        prev
+          ? {
+              ...prev,
+              members: prev.members.filter((member) => member.id !== memberId),
+            }
+          : prev,
+      );
+      setToast({ message: "Membre retiré de l’évènement.", variant: "success" });
+    } catch (err) {
+      const message =
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : "Impossible de retirer ce membre pour le moment.";
+      setToast({ message, variant: "error" });
+    }
+  };
+
+  const handleLeaveEvent = async () => {
+    if (isLeaving || !canLeaveEvent) {
+      return;
+    }
+
+    setIsLeaving(true);
+    try {
+      await eventApi.leave(eventId);
+      setToast({ message: "Tu as quitté l’évènement.", variant: "success" });
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("tripcrew:eventLeft"));
+      }
+      router.replace("/events");
+      router.refresh();
+    } catch (err) {
+      const message =
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : "Impossible de quitter l’évènement pour le moment.";
+      setToast({ message, variant: "error" });
+      setIsLeaving(false);
+    }
+  };
+
+  const handleRemoveInvitation = async (memberId: number) => {
+    try {
+      await eventApi.removeInvitation(eventId, memberId);
+      setEvent((prev) =>
+        prev
+          ? {
+              ...prev,
+              members: prev.members.filter((member) => member.id !== memberId),
+            }
+          : prev,
+      );
+      setToast({ message: "Invitation supprimée.", variant: "success" });
+    } catch (err) {
+      const message =
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : "Impossible de supprimer cette invitation pour le moment.";
+      setToast({ message, variant: "error" });
+    }
+  };
   useEffect(() => {
     if (!toast) return;
     const timeout = setTimeout(() => setToast(null), 4000);
@@ -301,6 +400,14 @@ export default function EventDetailPage() {
                 disabled={!event}
               >
                 Voir les membres
+              </button>
+              <button
+                type="button"
+                className={styles.leaveAction}
+                onClick={handleLeaveEvent}
+                disabled={!canLeaveEvent || isLeaving}
+              >
+                {leaveButtonLabel}
               </button>
               {isOrganizer ? (
                 <>
@@ -526,25 +633,47 @@ export default function EventDetailPage() {
                     }`}
                   >
                     <div className={styles.memberHeader}>
-                      <h3 className={styles.memberName}>
-                        {member.firstName} {member.lastName}
-                      </h3>
-                      {member.role === "organizer" ? (
-                        <span className={styles.roleTag}>Organisateur</span>
-                      ) : null}
-                      {member.status === "pending" ? (
-                        <span className={styles.memberStatusBadge}>En attente</span>
-                      ) : null}
+                      <div>
+                        <h3 className={styles.memberName}>
+                          {member.firstName} {member.lastName}
+                        </h3>
+                        <p className={styles.memberContact}>
+                          Contact :{" "}
+                          {(() => {
+                            const parts = [member.phone, member.email].filter(
+                              (value): value is string => Boolean(value),
+                            );
+                            return parts.length > 0 ? parts.join(" • ") : "Non renseigné";
+                          })()}
+                        </p>
+                      </div>
+                      <div className={styles.memberHeaderActions}>
+                        {member.status === "pending" ? (
+                          <span className={styles.memberStatusBadge}>En attente</span>
+                        ) : null}
+                        {member.role === "organizer" ? (
+                          <span className={styles.roleTag}>Organisateur</span>
+                        ) : null}
+                        {isOrganizer && member.status === "pending" ? (
+                          <button
+                            type="button"
+                            className={styles.memberRemoveButton}
+                            onClick={() => handleRemoveInvitation(member.id)}
+                          >
+                            Supprimer l’invitation
+                          </button>
+                        ) : null}
+                        {isOrganizer && member.status === "active" && member.userId !== user?.id ? (
+                          <button
+                            type="button"
+                            className={styles.memberRemoveButton}
+                            onClick={() => handleRemoveMember(member.id)}
+                          >
+                            Retirer du groupe
+                          </button>
+                        ) : null}
+                      </div>
                     </div>
-                    <p className={styles.memberContact}>
-                      Contact :{" "}
-                      {(() => {
-                        const parts = [member.phone, member.email].filter(
-                          (value): value is string => Boolean(value),
-                        );
-                        return parts.length > 0 ? parts.join(" • ") : "Non renseigné";
-                      })()}
-                    </p>
                   </div>
                 ))}
               </div>

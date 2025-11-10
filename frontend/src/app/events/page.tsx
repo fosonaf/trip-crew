@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuthContext } from "@/components/providers/AuthProvider";
@@ -31,20 +31,18 @@ export default function EventsPage() {
   const [events, setEvents] = useState<EventSummary[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (isHydrated && !token) {
-      router.replace("/login");
-    }
-  }, [token, isHydrated, router]);
+  const fetchEvents = useCallback(
+    async (withSpinner = true) => {
+      if (!token) {
+        return;
+      }
 
-  useEffect(() => {
-    if (!isHydrated || !token) {
-      return;
-    }
-
-    const fetchEvents = async () => {
-      setIsLoading(true);
+      if (withSpinner) {
+        setIsLoading(true);
+        setFeedback(null);
+      }
       setError(null);
 
       try {
@@ -57,12 +55,61 @@ export default function EventsPage() {
             : "Impossible de récupérer tes évènements pour le moment.",
         );
       } finally {
-        setIsLoading(false);
+        if (withSpinner) {
+          setIsLoading(false);
+        }
       }
+    },
+    [token],
+  );
+
+  useEffect(() => {
+    if (isHydrated && !token) {
+      router.replace("/login");
+    }
+  }, [token, isHydrated, router]);
+
+  useEffect(() => {
+    if (!isHydrated || !token) {
+      return;
+    }
+
+    fetchEvents(true);
+  }, [isHydrated, token, fetchEvents]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const handler = () => {
+      fetchEvents(false);
     };
 
-    fetchEvents();
-  }, [isHydrated, token]);
+    window.addEventListener("tripcrew:invitationAccepted", handler);
+    window.addEventListener("tripcrew:eventLeft", handler);
+    return () => {
+      window.removeEventListener("tripcrew:invitationAccepted", handler);
+      window.removeEventListener("tripcrew:eventLeft", handler);
+    };
+  }, [fetchEvents]);
+
+  const handleLeaveEvent = async (event: EventSummary) => {
+    try {
+      await eventApi.leave(String(event.id));
+      setEvents((prev) => prev.filter((item) => item.id !== event.id));
+      setFeedback("Tu as quitté l’évènement.");
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("tripcrew:eventLeft"));
+      }
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Impossible de quitter l’évènement pour le moment.",
+      );
+    }
+  };
 
   const displayName = useMemo(() => formatName(user?.firstName), [user?.firstName]);
 
@@ -82,6 +129,7 @@ export default function EventsPage() {
             Bienvenue <span className={styles.accent}>{displayName}</span> !
           </h1>
         </div>
+        {feedback ? <div className={styles.feedback}>{feedback}</div> : null}
         <p className={styles.subtitle}>
           Prépare ton prochain voyage en invitant ton équipe, planifie chaque étape et reste synchronisé
           avec le chat temps réel. Commence dès maintenant en créant ton premier événement.
@@ -123,49 +171,67 @@ export default function EventsPage() {
         ) : (
           <div className={styles.eventList}>
             {events.map((event) => (
-              <Link key={event.id} href={`/events/${event.id}`} className={styles.eventCard}>
-                <header className={styles.eventHeader}>
-                  <h3 className={styles.eventTitle}>{event.name}</h3>
-                  {event.role === "organizer" ? (
-                    <span className={styles.roleBadge} title="Tu es organisateur">
-                      <span className={styles.roleDot} aria-hidden="true" />
-                      Organisateur
-                    </span>
+              <div key={event.id} className={styles.eventCard}>
+                <Link href={`/events/${event.id}`} className={styles.eventCardLink}>
+                  <header className={styles.eventHeader}>
+                    <h3 className={styles.eventTitle}>{event.name}</h3>
+                    <div className={styles.eventHeaderBadges}>
+                      {event.role === "organizer" ? (
+                        <span className={styles.roleBadge} title="Tu es organisateur">
+                          <span className={styles.roleDot} aria-hidden="true" />
+                          Organisateur
+                        </span>
+                      ) : null}
+                    </div>
+                  </header>
+                  {event.description ? (
+                    <p className={styles.eventDescription}>{event.description}</p>
                   ) : null}
-                </header>
-                {event.description ? (
-                  <p className={styles.eventDescription}>{event.description}</p>
-                ) : null}
-                <dl className={styles.meta}>
-                  <div>
-                    <dt>Date de début</dt>
-                    <dd>{formatDateTime(event.startDate)}</dd>
-                  </div>
-                  <div>
-                    <dt>Date de fin</dt>
-                    <dd>{formatDateTime(event.endDate)}</dd>
-                  </div>
-                  <div>
-                    <dt>Lieu</dt>
-                    <dd>{event.location || "Non précisé"}</dd>
-                  </div>
-                  <div>
-                    <dt>Tarif</dt>
-                    <dd>
-                      {event.isPaid
-                        ? `${event.price?.toLocaleString("fr-FR", {
-                            minimumFractionDigits: 0,
-                            maximumFractionDigits: 2,
-                          })} €`
-                        : "Gratuit"}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>Statut paiement</dt>
-                    <dd>{event.paymentStatus ? event.paymentStatus : "—"}</dd>
-                  </div>
-                </dl>
-              </Link>
+                  <dl className={styles.meta}>
+                    <div>
+                      <dt>Date de début</dt>
+                      <dd>{formatDateTime(event.startDate)}</dd>
+                    </div>
+                    <div>
+                      <dt>Date de fin</dt>
+                      <dd>{formatDateTime(event.endDate)}</dd>
+                    </div>
+                    <div>
+                      <dt>Lieu</dt>
+                      <dd>{event.location || "Non précisé"}</dd>
+                    </div>
+                    <div>
+                      <dt>Tarif</dt>
+                      <dd>
+                        {event.isPaid
+                          ? `${event.price?.toLocaleString("fr-FR", {
+                              minimumFractionDigits: 0,
+                              maximumFractionDigits: 2,
+                            })} €`
+                          : "Gratuit"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Statut paiement</dt>
+                      <dd>{event.paymentStatus ? event.paymentStatus : "—"}</dd>
+                    </div>
+                  </dl>
+                </Link>
+                <div className={styles.eventCardFooter}>
+                  <button
+                    type="button"
+                    className={styles.leaveButton}
+                    onClick={() => handleLeaveEvent(event)}
+                    disabled={
+                      event.role === "organizer" && event.organizerCount <= 1
+                    }
+                  >
+                    {event.role === "organizer" && event.organizerCount <= 1
+                      ? "Dernier organisateur"
+                      : "Quitter l’évènement"}
+                  </button>
+                </div>
+              </div>
             ))}
           </div>
         )}
