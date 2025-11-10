@@ -33,8 +33,9 @@ La structure principale du backend se trouve dans `backend/src/` (`controllers`,
 
 ```bash
 git clone <repo-url>
-cd trip-crew/backend
-npm install
+cd trip-crew
+npm install --prefix backend
+npm install --prefix frontend
 ```
 
 ## Démarrage du serveur
@@ -77,6 +78,16 @@ L'API est exposée sur `http://localhost:<PORT>` et le WebSocket sur le même po
    node test-socketio.js
    ```
 4. Une fois connecté, le script rejoint la room de l'événement et vous permet d'envoyer des messages depuis le terminal. Vérifiez que les événements `new_message` ou les erreurs éventuelles s'affichent comme attendu.
+
+## Démarrer le front
+
+1. Dans un premier terminal, lancez le backend (`cd backend && npm run dev`) afin de servir l'API.
+2. Dans un second terminal :
+   ```bash
+   cd frontend
+   npm run dev
+   ```
+3. Ouvrez `http://localhost:3000` pour accéder à l’interface web Trip Crew.
 
 ## Ressources complémentaires
 
