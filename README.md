@@ -38,6 +38,29 @@ npm install --prefix backend
 npm install --prefix frontend
 ```
 
+## Configuration de l'environnement
+
+Dans le dossier `backend/`, créer un fichier `.env` à partir de cet exemple :
+
+```env
+PORT=5000
+NODE_ENV=development
+
+CLIENT_URL=http://localhost:3000
+CLIENT_URLS=http://localhost:3000,http://localhost:5173
+
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=trip_crew
+DB_USER=postgres
+DB_PASSWORD=postgres
+
+JWT_SECRET=remplacez-moi
+JWT_EXPIRES_IN=7d
+```
+
+> `CLIENT_URLS` accepte une liste séparée par des virgules. Ajoutez-y les origines autorisées (web, mobile, tests).
+
 ## Démarrage du serveur
 
 | Mode        | Commande             | Description                                    |

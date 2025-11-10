@@ -16,10 +16,16 @@ import { startNotificationScheduler } from './services/notificationService';
 dotenv.config();
 
 const app = express();
+
+const allowedOrigins = (process.env.CLIENT_URLS ?? process.env.CLIENT_URL ?? 'http://localhost:5173,http://localhost:3000')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
-    origin: '*',
+    origin: allowedOrigins,
     methods: ['GET', 'POST'],
     credentials: true,
   },
@@ -33,7 +39,7 @@ io.engine.on("connection_error", (err) => {
 });
 
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:5173',
+  origin: allowedOrigins,
   credentials: true,
 }));
 app.use(express.json());
