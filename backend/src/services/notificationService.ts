@@ -1,54 +1,78 @@
 import cron from 'node-cron';
 import { Server } from 'socket.io';
-import pool from '../config/database';
+import prisma from '../config/prisma';
+
+const getAlertThreshold = (minutes: number | null | undefined, reference: Date): Date | null => {
+  if (minutes === null || minutes === undefined || minutes <= 0) {
+    return null;
+  }
+  return new Date(reference.getTime() + minutes * 60 * 1000);
+};
 
 export const startNotificationScheduler = (io: Server): void => {
   cron.schedule('* * * * *', async () => {
     try {
       const now = new Date();
-      
-      const result = await pool.query(
-        `SELECT es.*, e.name as event_name
-         FROM event_steps es
-         JOIN events e ON es.event_id = e.id
-         WHERE es.scheduled_time > $1
-         AND es.scheduled_time <= $1 + (es.alert_before_minutes || ' minutes')::interval`,
-        [now]
-      );
 
-      for (const step of result.rows) {
-        const membersResult = await pool.query(
-          'SELECT user_id FROM event_members WHERE event_id = $1',
-          [step.event_id]
-        );
+      const steps = await prisma.eventStep.findMany({
+        where: {
+          scheduledTime: { gt: now },
+        },
+        include: {
+          event: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      });
 
-        for (const member of membersResult.rows) {
-          const existingNotif = await pool.query(
-            'SELECT id FROM notifications WHERE user_id = $1 AND step_id = $2',
-            [member.user_id, step.id]
-          );
+      for (const step of steps) {
+        const threshold = getAlertThreshold(step.alertBeforeMinutes, now);
+        if (!threshold) {
+          continue;
+        }
 
-          if (existingNotif.rows.length === 0) {
-            await pool.query(
-              `INSERT INTO notifications (user_id, event_id, step_id, title, message)
-               VALUES ($1, $2, $3, $4, $5)`,
-              [
-                member.user_id,
-                step.event_id,
-                step.id,
-                `Upcoming: ${step.name}`,
-                `${step.name} for ${step.event_name} is scheduled at ${step.scheduled_time}. Location: ${step.location || 'TBD'}`,
-              ]
-            );
+        if (step.scheduledTime > threshold) {
+          continue;
+        }
 
-            if (io) {
-              io.to(`user_${member.user_id}`).emit('notification', {
-                title: `Upcoming: ${step.name}`,
-                message: `${step.name} is coming up soon!`,
-                eventId: step.event_id,
-                stepId: step.id,
-              });
-            }
+        const members = await prisma.eventMember.findMany({
+          where: { eventId: step.eventId },
+          select: { userId: true },
+        });
+
+        for (const member of members) {
+          const existingNotification = await prisma.notification.findFirst({
+            where: {
+              userId: member.userId,
+              stepId: step.id,
+            },
+            select: { id: true },
+          });
+
+          if (existingNotification) {
+            continue;
+          }
+
+          await prisma.notification.create({
+            data: {
+              userId: member.userId,
+              eventId: step.eventId,
+              stepId: step.id,
+              title: `Upcoming: ${step.name}`,
+              message: `${step.name} for ${step.event.name} is scheduled at ${step.scheduledTime.toISOString()}. Location: ${step.location ?? 'TBD'}`,
+            },
+          });
+
+          if (io) {
+            io.to(`user_${member.userId}`).emit('notification', {
+              title: `Upcoming: ${step.name}`,
+              message: `${step.name} is coming up soon!`,
+              eventId: step.eventId,
+              stepId: step.id,
+            });
           }
         }
       }

@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
-import pool from '../config/database';
+import prisma from '../config/prisma';
 import { generateToken } from '../config/jwt';
 
 export const register = async (req: Request, res: Response): Promise<void> => {
@@ -14,24 +14,24 @@ export const register = async (req: Request, res: Response): Promise<void> => {
 
     const normalizedPhone = phone.trim();
 
-    const phoneExists = await pool.query(
-      'SELECT id FROM users WHERE phone = $1',
-      [normalizedPhone]
-    );
+    const phoneExists = await prisma.user.findUnique({
+      where: { phone: normalizedPhone },
+      select: { id: true },
+    });
 
-    if (phoneExists.rows.length > 0) {
+    if (phoneExists) {
       res.status(400).json({ error: 'Phone number already registered' });
       return;
     }
 
-    let normalizedEmail: string | null = null;
-    if (email && email.trim()) {
-      normalizedEmail = email.trim().toLowerCase();
-      const existingEmail = await pool.query(
-        'SELECT id FROM users WHERE email = $1',
-        [normalizedEmail]
-      );
-      if (existingEmail.rows.length > 0) {
+    const normalizedEmail = email?.trim().toLowerCase() ?? null;
+
+    if (normalizedEmail) {
+      const existingEmail = await prisma.user.findUnique({
+        where: { email: normalizedEmail },
+        select: { id: true },
+      });
+      if (existingEmail) {
         res.status(400).json({ error: 'Email already registered' });
         return;
       }
@@ -39,24 +39,34 @@ export const register = async (req: Request, res: Response): Promise<void> => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const result = await pool.query(
-      `INSERT INTO users (email, password, first_name, last_name, phone, avatar_url) 
-       VALUES ($1, $2, $3, $4, $5, $6) 
-       RETURNING id, email, first_name, last_name, phone, avatar_url`,
-      [normalizedEmail, hashedPassword, firstName, lastName, normalizedPhone, avatarUrl ?? null]
-    );
-
-    const user = result.rows[0];
+    const user = await prisma.user.create({
+      data: {
+        email: normalizedEmail,
+        password: hashedPassword,
+        firstName,
+        lastName,
+        phone: normalizedPhone,
+        avatarUrl: avatarUrl ?? null,
+      },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        phone: true,
+        avatarUrl: true,
+      },
+    });
     const token = generateToken(user.id);
 
     res.status(201).json({
       user: {
         id: user.id,
         email: user.email,
-        firstName: user.first_name,
-        lastName: user.last_name,
+        firstName: user.firstName,
+        lastName: user.lastName,
         phone: user.phone,
-        avatarUrl: user.avatar_url,
+        avatarUrl: user.avatarUrl,
       },
       token,
     });
@@ -75,17 +85,15 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const result = await pool.query(
-      'SELECT * FROM users WHERE phone = $1',
-      [phone.trim()]
-    );
+    const user = await prisma.user.findUnique({
+      where: { phone: phone.trim() },
+    });
 
-    if (result.rows.length === 0) {
+    if (!user) {
       res.status(401).json({ error: 'Invalid credentials' });
       return;
     }
 
-    const user = result.rows[0];
     const isValidPassword = await bcrypt.compare(password, user.password);
     
     if (!isValidPassword) {
@@ -99,10 +107,10 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       user: {
         id: user.id,
         email: user.email,
-        firstName: user.first_name,
-        lastName: user.last_name,
+        firstName: user.firstName,
+        lastName: user.lastName,
         phone: user.phone,
-        avatarUrl: user.avatar_url,
+        avatarUrl: user.avatarUrl,
       },
       token,
     });
@@ -123,10 +131,10 @@ export const getProfile = async (req: Request, res: Response): Promise<void> => 
       user: {
         id: req.user.id,
         email: req.user.email,
-        firstName: req.user.first_name,
-        lastName: req.user.last_name,
+        firstName: req.user.firstName,
+        lastName: req.user.lastName,
         phone: req.user.phone,
-        avatarUrl: req.user.avatar_url,
+        avatarUrl: req.user.avatarUrl,
       },
     });
   } catch (error) {
@@ -156,34 +164,35 @@ export const updateProfile = async (req: Request, res: Response): Promise<void> 
       return;
     }
 
-    const current = await pool.query(
-      'SELECT email, first_name, last_name, phone, avatar_url FROM users WHERE id = $1',
-      [userId]
-    );
+    const current = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        email: true,
+        firstName: true,
+        lastName: true,
+        phone: true,
+        avatarUrl: true,
+      },
+    });
 
-    if (current.rows.length === 0) {
+    if (!current) {
       res.status(404).json({ error: 'User not found' });
       return;
     }
-
-    const existing = current.rows[0] as {
-      email: string | null;
-      first_name: string;
-      last_name: string;
-      phone: string;
-      avatar_url: string | null;
-    };
 
     let normalizedEmail: string | null | undefined = undefined;
     if (email !== undefined) {
       const trimmedEmail = email.trim();
       if (trimmedEmail) {
         normalizedEmail = trimmedEmail.toLowerCase();
-        const existingEmail = await pool.query(
-          'SELECT id FROM users WHERE email = $1 AND id <> $2',
-          [normalizedEmail, userId]
-        );
-        if (existingEmail.rows.length > 0) {
+        const existingEmail = await prisma.user.findFirst({
+          where: {
+            email: normalizedEmail,
+            NOT: { id: userId },
+          },
+          select: { id: true },
+        });
+        if (existingEmail) {
           res.status(400).json({ error: 'Email already in use' });
           return;
         }
@@ -195,54 +204,52 @@ export const updateProfile = async (req: Request, res: Response): Promise<void> 
     let normalizedPhone: string | undefined = undefined;
     if (phone !== undefined) {
       normalizedPhone = phone.trim();
-      if (normalizedPhone !== existing.phone) {
-        const existingPhone = await pool.query(
-          'SELECT id FROM users WHERE phone = $1 AND id <> $2',
-          [normalizedPhone, userId]
-        );
-        if (existingPhone.rows.length > 0) {
+      if (normalizedPhone !== current.phone) {
+        const existingPhone = await prisma.user.findFirst({
+          where: {
+            phone: normalizedPhone,
+            NOT: { id: userId },
+          },
+          select: { id: true },
+        });
+        if (existingPhone) {
           res.status(400).json({ error: 'Phone number already in use' });
           return;
         }
       }
     }
 
-    const updated = await pool.query(
-      `UPDATE users
-       SET email = $1,
-           first_name = $2,
-           last_name = $3,
-           phone = $4,
-           avatar_url = $5,
-           updated_at = CURRENT_TIMESTAMP
-       WHERE id = $6
-       RETURNING id, email, first_name, last_name, phone, avatar_url`,
-      [
-        normalizedEmail !== undefined ? normalizedEmail : existing.email,
-        firstName ?? existing.first_name,
-        lastName ?? existing.last_name,
-        normalizedPhone ?? existing.phone,
-        avatarUrl ?? existing.avatar_url,
-        userId,
-      ]
-    );
+    const updated = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        email: normalizedEmail !== undefined ? normalizedEmail : current.email,
+        firstName: firstName ?? current.firstName,
+        lastName: lastName ?? current.lastName,
+        phone: normalizedPhone ?? current.phone,
+        avatarUrl: avatarUrl ?? current.avatarUrl,
+      },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        phone: true,
+        avatarUrl: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
 
-    const user = updated.rows[0];
-
-    const refreshed = await pool.query(
-      'SELECT id, email, first_name, last_name, phone, avatar_url, created_at, updated_at FROM users WHERE id = $1',
-      [userId]
-    );
-    req.user = refreshed.rows[0];
+    req.user = updated;
 
     res.json({
       user: {
-        id: user.id,
-        email: user.email,
-        firstName: user.first_name,
-        lastName: user.last_name,
-        phone: user.phone,
-        avatarUrl: user.avatar_url,
+        id: updated.id,
+        email: updated.email,
+        firstName: updated.firstName,
+        lastName: updated.lastName,
+        phone: updated.phone,
+        avatarUrl: updated.avatarUrl,
       },
     });
   } catch (error) {

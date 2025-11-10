@@ -6,9 +6,9 @@ interface CustomError extends Error {
 
 export const errorHandler = (
   err: CustomError,
-  req: Request,
+  _req: Request,
   res: Response,
-  next: NextFunction
+  _next: NextFunction
 ): void => {
   console.error('Error:', err);
 
@@ -21,6 +21,6 @@ export const errorHandler = (
   });
 };
 
-export const notFound = (req: Request, res: Response): void => {
+export const notFound = (_req: Request, res: Response): void => {
   res.status(404).json({ error: 'Route not found' });
 };

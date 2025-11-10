@@ -2,77 +2,77 @@ export interface User {
   id: number;
   email: string | null;
   password: string;
-  first_name: string;
-  last_name: string;
+  firstName: string;
+  lastName: string;
   phone: string;
-  avatar_url?: string | null;
-  created_at: Date;
-  updated_at: Date;
+  avatarUrl?: string | null;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface Event {
   id: number;
   name: string;
   description?: string;
-  start_date?: Date;
-  end_date?: Date;
+  startDate?: Date;
+  endDate?: Date;
   location?: string;
-  is_paid: boolean;
+  isPaid: boolean;
   price?: number;
-  created_by: number;
-  created_at: Date;
-  updated_at: Date;
+  createdBy: number;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface EventMember {
   id: number;
-  event_id: number;
-  user_id: number;
+  eventId: number;
+  userId: number;
   role: 'organizer' | 'member';
-  payment_status: 'pending' | 'paid' | 'refunded';
+  paymentStatus: 'pending' | 'paid' | 'refunded';
   status: 'active' | 'pending';
-  invited_by?: number | null;
-  qr_code?: string;
-  joined_at: Date;
+  invitedBy?: number | null;
+  qrCode?: string;
+  joinedAt: Date;
 }
 
 export interface EventStep {
   id: number;
-  event_id: number;
+  eventId: number;
   name: string;
   description?: string;
   location?: string;
-  scheduled_time: Date;
-  alert_before_minutes: number;
-  created_at: Date;
-  updated_at: Date;
+  scheduledTime: Date;
+  alertBeforeMinutes: number;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface CheckIn {
   id: number;
-  step_id: number;
-  member_id: number;
-  checked_in_at: Date;
-  checked_by?: number;
+  stepId: number;
+  memberId: number;
+  checkedInAt: Date;
+  checkedBy?: number;
 }
 
 export interface Message {
   id: number;
-  event_id: number;
-  user_id: number;
+  eventId: number;
+  userId: number;
   content: string;
-  created_at: Date;
+  createdAt: Date;
 }
 
 export interface Notification {
   id: number;
-  user_id: number;
-  event_id?: number;
-  step_id?: number;
+  userId: number;
+  eventId?: number;
+  stepId?: number;
   title: string;
   message: string;
-  is_read: boolean;
-  created_at: Date;
+  isRead: boolean;
+  createdAt: Date;
 }
 
 export interface AuthResponse {

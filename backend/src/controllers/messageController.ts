@@ -1,33 +1,44 @@
 import { Request, Response } from 'express';
-import pool from '../config/database';
+import prisma from '../config/prisma';
 
 export const getMessages = async (req: Request, res: Response): Promise<void> => {
   try {
     const { eventId } = req.params;
-    const { limit = 50, offset = 0 } = req.query;
+    const limit = Number(req.query.limit ?? 50);
+    const offset = Number(req.query.offset ?? 0);
 
-    const result = await pool.query(
-      `SELECT m.*, u.first_name, u.last_name 
-       FROM messages m
-       JOIN users u ON m.user_id = u.id
-       WHERE m.event_id = $1
-       ORDER BY m.created_at DESC
-       LIMIT $2 OFFSET $3`,
-      [eventId, limit, offset]
-    );
-
-    const messages = result.rows.map(msg => ({
-      id: msg.id,
-      content: msg.content,
-      createdAt: msg.created_at,
-      user: {
-        id: msg.user_id,
-        firstName: msg.first_name,
-        lastName: msg.last_name,
+    const messages = await prisma.message.findMany({
+      where: { eventId: Number(eventId) },
+      orderBy: { createdAt: 'desc' },
+      skip: Number.isNaN(offset) ? 0 : offset,
+      take: Number.isNaN(limit) ? 50 : limit,
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
       },
-    }));
+    });
 
-    res.json(messages.reverse());
+    type MessageWithUser = (typeof messages)[number];
+
+    res.json(
+      messages
+        .reverse()
+        .map((message: MessageWithUser) => ({
+          id: message.id,
+          content: message.content,
+          createdAt: message.createdAt,
+          user: {
+            id: message.user.id,
+            firstName: message.user.firstName,
+            lastName: message.user.lastName,
+          },
+        })),
+    );
   } catch (error) {
     console.error('Get messages error:', error);
     res.status(500).json({ error: 'Failed to get messages' });
@@ -37,24 +48,34 @@ export const getMessages = async (req: Request, res: Response): Promise<void> =>
 export const createMessage = async (req: Request, res: Response): Promise<void> => {
   try {
     const { eventId } = req.params;
-    const { content } = req.body;
+    const { content } = req.body as { content?: string };
     const userId = req.user?.id;
 
-    const result = await pool.query(
-      `INSERT INTO messages (event_id, user_id, content)
-       VALUES ($1, $2, $3)
-       RETURNING *`,
-      [eventId, userId, content]
-    );
+    if (!userId) {
+      res.status(401).json({ error: 'Not authenticated' });
+      return;
+    }
 
-    const message = result.rows[0];
+    if (!content || !content.trim()) {
+      res.status(400).json({ error: 'Message content is required' });
+      return;
+    }
 
-    res.status(201).json({
-      id: message.id,
-      content: message.content,
-      createdAt: message.created_at,
-      userId: message.user_id,
+    const message = await prisma.message.create({
+      data: {
+        eventId: Number(eventId),
+        userId,
+        content: content.trim(),
+      },
+      select: {
+        id: true,
+        content: true,
+        createdAt: true,
+        userId: true,
+      },
     });
+
+    res.status(201).json(message);
   } catch (error) {
     console.error('Create message error:', error);
     res.status(500).json({ error: 'Failed to create message' });

@@ -1,0 +1,152 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                 Int                 @id @default(autoincrement())
+  email              String?             @unique
+  password           String
+  firstName          String              @map("first_name")
+  lastName           String              @map("last_name")
+  phone              String              @unique
+  avatarUrl          String?             @map("avatar_url")
+  createdAt          DateTime            @default(now()) @map("created_at")
+  updatedAt          DateTime            @default(now()) @updatedAt @map("updated_at")
+  events             Event[]             @relation("EventCreator")
+  memberships        EventMember[]       @relation("MemberUser")
+  invitationsSent    EventMember[]       @relation("MemberInvitedBy")
+  joinRequests       EventJoinRequest[]
+  stepsChecked       CheckIn[]           @relation("CheckedBy")
+  messages           Message[]
+  notifications      Notification[]
+
+  @@map("users")
+}
+
+model Event {
+  id              Int                @id @default(autoincrement())
+  name            String
+  description     String?
+  startDate       DateTime?          @map("start_date")
+  endDate         DateTime?          @map("end_date")
+  location        String?
+  isPaid          Boolean            @map("is_paid") @default(false)
+  price           Decimal?           @db.Decimal(10, 2)
+  createdBy       Int                @map("created_by")
+  createdAt       DateTime           @default(now()) @map("created_at")
+  updatedAt       DateTime           @default(now()) @updatedAt @map("updated_at")
+  creator         User               @relation("EventCreator", fields: [createdBy], references: [id], onDelete: Cascade)
+  members         EventMember[]
+  steps           EventStep[]
+  messages        Message[]
+  notifications   Notification[]
+  joinRequests    EventJoinRequest[]
+
+  @@map("events")
+}
+
+model EventMember {
+  id             Int        @id @default(autoincrement())
+  eventId        Int        @map("event_id")
+  userId         Int        @map("user_id")
+  role           String     @default("member")
+  paymentStatus  String?    @map("payment_status")
+  status         String     @default("active")
+  invitedBy      Int?       @map("invited_by")
+  qrCode         String?    @map("qr_code")
+  joinedAt       DateTime   @default(now()) @map("joined_at")
+  updatedAt      DateTime?  @map("updated_at")
+  event          Event      @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user           User       @relation("MemberUser", fields: [userId], references: [id], onDelete: Cascade)
+  inviter        User?      @relation("MemberInvitedBy", fields: [invitedBy], references: [id])
+  checkIns       CheckIn[]
+
+  @@unique([eventId, userId])
+  @@index([eventId], map: "idx_event_members_event")
+  @@index([userId], map: "idx_event_members_user")
+  @@index([status], map: "event_members_status_idx")
+  @@map("event_members")
+}
+
+model EventStep {
+  id                 Int        @id @default(autoincrement())
+  eventId            Int        @map("event_id")
+  name               String
+  description        String?
+  location           String?
+  scheduledTime      DateTime   @map("scheduled_time")
+  alertBeforeMinutes Int?       @map("alert_before_minutes") @default(30)
+  createdAt          DateTime   @default(now()) @map("created_at")
+  updatedAt          DateTime   @default(now()) @updatedAt @map("updated_at")
+  event              Event      @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  checkIns           CheckIn[]
+  notifications      Notification[]
+
+  @@map("event_steps")
+}
+
+model CheckIn {
+  id          Int       @id @default(autoincrement())
+  stepId      Int       @map("step_id")
+  memberId    Int       @map("member_id")
+  checkedInAt DateTime  @default(now()) @map("checked_in_at")
+  checkedBy   Int?      @map("checked_by")
+  step        EventStep @relation(fields: [stepId], references: [id], onDelete: Cascade)
+  member      EventMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  checker     User?     @relation("CheckedBy", fields: [checkedBy], references: [id])
+
+  @@unique([stepId, memberId])
+  @@map("check_ins")
+}
+
+model Message {
+  id        Int      @id @default(autoincrement())
+  eventId   Int      @map("event_id")
+  userId    Int      @map("user_id")
+  content   String
+  createdAt DateTime @default(now()) @map("created_at")
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([eventId], map: "idx_messages_event")
+  @@map("messages")
+}
+
+model Notification {
+  id        Int       @id @default(autoincrement())
+  userId    Int       @map("user_id")
+  eventId   Int?      @map("event_id")
+  stepId    Int?      @map("step_id")
+  title     String
+  message   String
+  isRead    Boolean   @default(false) @map("is_read")
+  createdAt DateTime  @default(now()) @map("created_at")
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  event     Event?    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  step      EventStep? @relation(fields: [stepId], references: [id], onDelete: Cascade)
+
+  @@index([userId], map: "idx_notifications_user")
+  @@map("notifications")
+}
+
+model EventJoinRequest {
+  id        Int      @id @default(autoincrement())
+  eventId   Int      @map("event_id")
+  userId    Int      @map("user_id")
+  status    String   @default("pending")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId])
+  @@index([eventId], map: "event_join_requests_event_idx")
+  @@index([status], map: "event_join_requests_status_idx")
+  @@map("event_join_requests")
+}
+

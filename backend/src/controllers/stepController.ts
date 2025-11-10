@@ -1,27 +1,56 @@
 import { Request, Response } from 'express';
-import pool from '../config/database';
+import prisma from '../config/prisma';
+
+const parseDateTime = (value: string): Date | null => {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.valueOf()) ? null : date;
+};
 
 export const createStep = async (req: Request, res: Response): Promise<void> => {
   try {
     const { eventId } = req.params;
     const { name, description, location, scheduledTime, alertBeforeMinutes } = req.body;
 
-    const result = await pool.query(
-      `INSERT INTO event_steps (event_id, name, description, location, scheduled_time, alert_before_minutes)
-       VALUES ($1, $2, $3, $4, $5, $6)
-       RETURNING *`,
-      [eventId, name, description, location, scheduledTime, alertBeforeMinutes || 30]
-    );
+    const eventExists = await prisma.event.findUnique({
+      where: { id: Number(eventId) },
+      select: { id: true },
+    });
 
-    const step = result.rows[0];
+    if (!eventExists) {
+      res.status(404).json({ error: 'Event not found' });
+      return;
+    }
+
+    const step = await prisma.eventStep.create({
+      data: {
+        eventId: Number(eventId),
+        name,
+        description: description ?? null,
+        location: location ?? null,
+        scheduledTime: parseDateTime(scheduledTime) ?? new Date(),
+        alertBeforeMinutes:
+          alertBeforeMinutes === undefined || alertBeforeMinutes === null
+            ? 30
+            : Number(alertBeforeMinutes),
+      },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        location: true,
+        scheduledTime: true,
+        alertBeforeMinutes: true,
+      },
+    });
 
     res.status(201).json({
       id: step.id,
       name: step.name,
       description: step.description,
       location: step.location,
-      scheduledTime: step.scheduled_time,
-      alertBeforeMinutes: step.alert_before_minutes,
+      scheduledTime: step.scheduledTime,
+      alertBeforeMinutes: step.alertBeforeMinutes,
     });
   } catch (error) {
     console.error('Create step error:', error);
@@ -33,21 +62,31 @@ export const getSteps = async (req: Request, res: Response): Promise<void> => {
   try {
     const { eventId } = req.params;
 
-    const result = await pool.query(
-      'SELECT * FROM event_steps WHERE event_id = $1 ORDER BY scheduled_time',
-      [eventId]
+    const steps = await prisma.eventStep.findMany({
+      where: { eventId: Number(eventId) },
+      orderBy: { scheduledTime: 'asc' },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        location: true,
+        scheduledTime: true,
+        alertBeforeMinutes: true,
+      },
+    });
+
+    type StepData = (typeof steps)[number];
+
+    res.json(
+      steps.map((step: StepData) => ({
+        id: step.id,
+        name: step.name,
+        description: step.description,
+        location: step.location,
+        scheduledTime: step.scheduledTime,
+        alertBeforeMinutes: step.alertBeforeMinutes,
+      })),
     );
-
-    const steps = result.rows.map(step => ({
-      id: step.id,
-      name: step.name,
-      description: step.description,
-      location: step.location,
-      scheduledTime: step.scheduled_time,
-      alertBeforeMinutes: step.alert_before_minutes,
-    }));
-
-    res.json(steps);
   } catch (error) {
     console.error('Get steps error:', error);
     res.status(500).json({ error: 'Failed to get steps' });
@@ -59,16 +98,21 @@ export const updateStep = async (req: Request, res: Response): Promise<void> => 
     const { eventId, stepId } = req.params;
     const { name, description, location, scheduledTime, alertBeforeMinutes } = req.body;
 
-    const result = await pool.query(
-      `UPDATE event_steps 
-       SET name = $1, description = $2, location = $3, scheduled_time = $4, 
-           alert_before_minutes = $5, updated_at = CURRENT_TIMESTAMP
-       WHERE id = $6 AND event_id = $7
-       RETURNING *`,
-      [name, description, location, scheduledTime, alertBeforeMinutes, stepId, eventId]
-    );
+    const result = await prisma.eventStep.updateMany({
+      where: { id: Number(stepId), eventId: Number(eventId) },
+      data: {
+        name,
+        description: description ?? null,
+        location: location ?? null,
+        scheduledTime: parseDateTime(scheduledTime) ?? new Date(),
+        alertBeforeMinutes:
+          alertBeforeMinutes === undefined || alertBeforeMinutes === null
+            ? null
+            : Number(alertBeforeMinutes),
+      },
+    });
 
-    if (result.rows.length === 0) {
+    if (result.count === 0) {
       res.status(404).json({ error: 'Step not found' });
       return;
     }
@@ -83,10 +127,11 @@ export const updateStep = async (req: Request, res: Response): Promise<void> => 
 export const deleteStep = async (req: Request, res: Response): Promise<void> => {
   try {
     const { eventId, stepId } = req.params;
-    await pool.query(
-      'DELETE FROM event_steps WHERE id = $1 AND event_id = $2',
-      [stepId, eventId]
-    );
+
+    await prisma.eventStep.deleteMany({
+      where: { id: Number(stepId), eventId: Number(eventId) },
+    });
+
     res.json({ message: 'Step deleted successfully' });
   } catch (error) {
     console.error('Delete step error:', error);

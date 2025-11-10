@@ -1,26 +1,34 @@
 import { Request, Response } from 'express';
-import pool from '../config/database';
+import prisma from '../config/prisma';
 
 export const checkIn = async (req: Request, res: Response): Promise<void> => {
   try {
     const { stepId } = req.params;
-    const { memberId } = req.body;
-    const checkedBy = req.user?.id;
+    const { memberId } = req.body as { memberId?: number };
+    const checkedBy = req.user?.id ?? null;
 
-    const existingCheckIn = await pool.query(
-      'SELECT id FROM check_ins WHERE step_id = $1 AND member_id = $2',
-      [stepId, memberId]
-    );
+    if (!memberId) {
+      res.status(400).json({ error: 'Member ID is required' });
+      return;
+    }
 
-    if (existingCheckIn.rows.length > 0) {
+    const existing = await prisma.checkIn.findFirst({
+      where: { stepId: Number(stepId), memberId: Number(memberId) },
+      select: { id: true },
+    });
+
+    if (existing) {
       res.status(400).json({ error: 'Already checked in' });
       return;
     }
 
-    await pool.query(
-      'INSERT INTO check_ins (step_id, member_id, checked_by) VALUES ($1, $2, $3)',
-      [stepId, memberId, checkedBy]
-    );
+    await prisma.checkIn.create({
+      data: {
+        stepId: Number(stepId),
+        memberId: Number(memberId),
+        checkedBy,
+      },
+    });
 
     res.status(201).json({ message: 'Check-in successful' });
   } catch (error) {
@@ -32,60 +40,74 @@ export const checkIn = async (req: Request, res: Response): Promise<void> => {
 export const scanQRCode = async (req: Request, res: Response): Promise<void> => {
   try {
     const { stepId } = req.params;
-    const { qrData } = req.body;
-    const checkedBy = req.user?.id;
+    const { qrData } = req.body as { qrData?: string };
+    const checkedBy = req.user?.id ?? null;
 
-    let parsedData;
-    try {
-      parsedData = JSON.parse(qrData);
-    } catch (e) {
+    if (!qrData) {
       res.status(400).json({ error: 'Invalid QR code' });
       return;
     }
 
-    const { eventId, memberId } = parsedData;
+    let parsedData: { eventId: number; memberId: number };
+    try {
+      parsedData = JSON.parse(qrData);
+    } catch {
+      res.status(400).json({ error: 'Invalid QR code' });
+      return;
+    }
 
-    const stepCheck = await pool.query(
-      'SELECT event_id FROM event_steps WHERE id = $1',
-      [stepId]
-    );
+    const step = await prisma.eventStep.findUnique({
+      where: { id: Number(stepId) },
+      select: { eventId: true },
+    });
 
-    if (stepCheck.rows.length === 0) {
+    if (!step) {
       res.status(404).json({ error: 'Step not found' });
       return;
     }
 
-    if (stepCheck.rows[0].event_id !== eventId) {
+    if (step.eventId !== parsedData.eventId) {
       res.status(400).json({ error: 'QR code does not match this event' });
       return;
     }
 
-    const existingCheckIn = await pool.query(
-      'SELECT id FROM check_ins WHERE step_id = $1 AND member_id = $2',
-      [stepId, memberId]
-    );
+    const existing = await prisma.checkIn.findFirst({
+      where: {
+        stepId: Number(stepId),
+        memberId: Number(parsedData.memberId),
+      },
+    });
 
-    if (existingCheckIn.rows.length > 0) {
+    if (existing) {
       res.status(400).json({ error: 'Already checked in' });
       return;
     }
 
-    await pool.query(
-      'INSERT INTO check_ins (step_id, member_id, checked_by) VALUES ($1, $2, $3)',
-      [stepId, memberId, checkedBy]
-    );
+    await prisma.checkIn.create({
+      data: {
+        stepId: Number(stepId),
+        memberId: Number(parsedData.memberId),
+        checkedBy,
+      },
+    });
 
-    const memberInfo = await pool.query(
-      `SELECT u.first_name, u.last_name 
-       FROM event_members em
-       JOIN users u ON em.user_id = u.id
-       WHERE em.id = $1`,
-      [memberId]
-    );
+    const member = await prisma.eventMember.findUnique({
+      where: { id: Number(parsedData.memberId) },
+      include: {
+        user: {
+          select: { firstName: true, lastName: true },
+        },
+      },
+    });
 
-    res.status(201).json({ 
+    res.status(201).json({
       message: 'Check-in successful',
-      member: memberInfo.rows[0]
+      member: member
+        ? {
+            first_name: member.user.firstName,
+            last_name: member.user.lastName,
+          }
+        : null,
     });
   } catch (error) {
     console.error('QR scan error:', error);
@@ -97,26 +119,32 @@ export const getCheckIns = async (req: Request, res: Response): Promise<void> =>
   try {
     const { stepId } = req.params;
 
-    const result = await pool.query(
-      `SELECT ci.*, em.id as member_id, u.first_name, u.last_name, em.role
-       FROM check_ins ci
-       JOIN event_members em ON ci.member_id = em.id
-       JOIN users u ON em.user_id = u.id
-       WHERE ci.step_id = $1
-       ORDER BY ci.checked_in_at DESC`,
-      [stepId]
+    const checkIns = await prisma.checkIn.findMany({
+      where: { stepId: Number(stepId) },
+      orderBy: { checkedInAt: 'desc' },
+      include: {
+        member: {
+          include: {
+            user: {
+              select: { firstName: true, lastName: true },
+            },
+          },
+        },
+      },
+    });
+
+    type CheckInWithMember = (typeof checkIns)[number];
+
+    res.json(
+      checkIns.map((checkIn: CheckInWithMember) => ({
+        id: checkIn.id,
+        memberId: checkIn.memberId,
+        firstName: checkIn.member.user.firstName,
+        lastName: checkIn.member.user.lastName,
+        role: checkIn.member.role,
+        checkedInAt: checkIn.checkedInAt,
+      })),
     );
-
-    const checkIns = result.rows.map(ci => ({
-      id: ci.id,
-      memberId: ci.member_id,
-      firstName: ci.first_name,
-      lastName: ci.last_name,
-      role: ci.role,
-      checkedInAt: ci.checked_in_at,
-    }));
-
-    res.json(checkIns);
   } catch (error) {
     console.error('Get check-ins error:', error);
     res.status(500).json({ error: 'Failed to get check-ins' });
@@ -127,46 +155,46 @@ export const getCheckInStatus = async (req: Request, res: Response): Promise<voi
   try {
     const { stepId } = req.params;
 
-    const stepResult = await pool.query(
-      'SELECT event_id FROM event_steps WHERE id = $1',
-      [stepId]
-    );
+    const step = await prisma.eventStep.findUnique({
+      where: { id: Number(stepId) },
+      select: { eventId: true },
+    });
 
-    if (stepResult.rows.length === 0) {
+    if (!step) {
       res.status(404).json({ error: 'Step not found' });
       return;
     }
 
-    const eventId = stepResult.rows[0].event_id;
+    const members = await prisma.eventMember.findMany({
+      where: { eventId: step.eventId },
+      include: {
+        user: {
+          select: { id: true, firstName: true, lastName: true },
+        },
+      },
+    });
 
-    const membersResult = await pool.query(
-      `SELECT em.id, em.role, u.first_name, u.last_name, u.id as user_id
-       FROM event_members em
-       JOIN users u ON em.user_id = u.id
-       WHERE em.event_id = $1`,
-      [eventId]
-    );
+    const checkIns = await prisma.checkIn.findMany({
+      where: { stepId: Number(stepId) },
+      select: { memberId: true },
+    });
 
-    const checkedInResult = await pool.query(
-      'SELECT member_id FROM check_ins WHERE step_id = $1',
-      [stepId]
-    );
+    const checkedInIds = new Set(checkIns.map((checkIn) => checkIn.memberId));
 
-    const checkedInIds = checkedInResult.rows.map(row => row.member_id);
-
-    const status = membersResult.rows.map(member => ({
+    type MemberWithUser = (typeof members)[number];
+    const status = members.map((member: MemberWithUser) => ({
       memberId: member.id,
-      userId: member.user_id,
-      firstName: member.first_name,
-      lastName: member.last_name,
+      userId: member.user.id,
+      firstName: member.user.firstName,
+      lastName: member.user.lastName,
       role: member.role,
-      checkedIn: checkedInIds.includes(member.id),
+      checkedIn: checkedInIds.has(member.id),
     }));
 
     res.json({
       total: status.length,
-      checkedIn: checkedInIds.length,
-      pending: status.length - checkedInIds.length,
+      checkedIn: checkedInIds.size,
+      pending: status.length - checkedInIds.size,
       members: status,
     });
   } catch (error) {

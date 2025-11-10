@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { verifyToken } from '../config/jwt';
-import pool from '../config/database';
+import prisma from '../config/prisma';
 
 export const authenticate = async (
   req: Request,
@@ -21,17 +21,26 @@ export const authenticate = async (
       return;
     }
 
-    const result = await pool.query(
-      'SELECT id, email, first_name, last_name, phone, avatar_url FROM users WHERE id = $1',
-      [decoded.userId]
-    );
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.userId },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        phone: true,
+        avatarUrl: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
 
-    if (result.rows.length === 0) {
+    if (!user) {
       res.status(401).json({ error: 'User not found' });
       return;
     }
 
-    req.user = result.rows[0];
+    req.user = user;
     next();
   } catch (error) {
     console.error('Auth middleware error:', error);
@@ -53,13 +62,17 @@ export const isEventOrganizer = async (
       return;
     }
 
-    const result = await pool.query(
-      `SELECT role FROM event_members 
-       WHERE event_id = $1 AND user_id = $2 AND role = 'organizer'`,
-      [eventId, userId]
-    );
+    const organizerMembership = await prisma.eventMember.findFirst({
+      where: {
+        eventId: Number(eventId),
+        userId,
+        role: 'organizer',
+        status: 'active',
+      },
+      select: { id: true },
+    });
 
-    if (result.rows.length === 0) {
+    if (!organizerMembership) {
       res.status(403).json({ error: 'Access denied. Organizer role required.' });
       return;
     }

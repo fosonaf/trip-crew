@@ -619,11 +619,16 @@ export default function EventDetailPage() {
             <div className={styles.topActions}>
               <button
                 type="button"
-                className={styles.ghostAction}
+                className={`${styles.ghostAction} ${styles.notificationAction}`}
                 onClick={() => setIsMembersModalOpen(true)}
                 disabled={!event}
               >
                 Voir les membres
+                <span
+                  className={`${styles.notificationBadge}`}
+                >
+                  {event?.members.length}
+                </span>
               </button>
               <button
                 type="button"

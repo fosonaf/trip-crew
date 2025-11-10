@@ -4,7 +4,7 @@ export const validateEmail = (email: string): boolean => {
 };
 
 export const validatePassword = (password: string): boolean => {
-  return password && password.length >= 6;
+  return typeof password === 'string' && password.length >= 6;
 };
 
 export const validateRequired = (value: any): boolean => {

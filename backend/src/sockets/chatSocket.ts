@@ -1,13 +1,13 @@
 import { Server, Socket } from 'socket.io';
-import pool from '../config/database';
+import prisma from '../config/prisma';
 import { verifyToken } from '../config/jwt';
 
 interface AuthenticatedSocket extends Socket {
   user?: {
     id: number;
-    email: string;
-    first_name: string;
-    last_name: string;
+    email: string | null;
+    firstName: string;
+    lastName: string;
   };
   currentEventId?: number;
 }
@@ -24,17 +24,28 @@ export const setupChatSocket = (io: Server): void => {
           return;
         }
 
-        const result = await pool.query(
-          'SELECT id, email, first_name, last_name FROM users WHERE id = $1',
-          [decoded.userId]
-        );
+        const user = await prisma.user.findUnique({
+          where: { id: decoded.userId },
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+          },
+        });
 
-        if (result.rows.length === 0) {
+        if (!user) {
           socket.emit('error', { message: 'User not found' });
           return;
         }
 
-        socket.user = result.rows[0];
+        socket.user = {
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+        };
+
         socket.emit('authenticated', { user: socket.user });
       } catch (error) {
         console.error('Socket auth error:', error);
@@ -49,12 +60,16 @@ export const setupChatSocket = (io: Server): void => {
           return;
         }
 
-        const result = await pool.query(
-          'SELECT id FROM event_members WHERE event_id = $1 AND user_id = $2',
-          [eventId, socket.user.id]
-        );
+        const membership = await prisma.eventMember.findFirst({
+          where: {
+            eventId,
+            userId: socket.user.id,
+            status: 'active',
+          },
+          select: { id: true },
+        });
 
-        if (result.rows.length === 0) {
+        if (!membership) {
           socket.emit('error', { message: 'Not a member of this event' });
           return;
         }
@@ -84,23 +99,27 @@ export const setupChatSocket = (io: Server): void => {
 
         const { eventId, content } = data;
 
-        const result = await pool.query(
-          `INSERT INTO messages (event_id, user_id, content)
-           VALUES ($1, $2, $3)
-           RETURNING *`,
-          [eventId, socket.user.id, content]
-        );
-
-        const message = result.rows[0];
+        const message = await prisma.message.create({
+          data: {
+            eventId,
+            userId: socket.user.id,
+            content,
+          },
+          select: {
+            id: true,
+            content: true,
+            createdAt: true,
+          },
+        });
 
         io.to(`event_${eventId}`).emit('new_message', {
           id: message.id,
           content: message.content,
-          createdAt: message.created_at,
+          createdAt: message.createdAt,
           user: {
             id: socket.user.id,
-            firstName: socket.user.first_name,
-            lastName: socket.user.last_name,
+            firstName: socket.user.firstName,
+            lastName: socket.user.lastName,
           },
         });
       } catch (error) {
@@ -113,8 +132,8 @@ export const setupChatSocket = (io: Server): void => {
       if (socket.user) {
         socket.to(`event_${eventId}`).emit('user_typing', {
           userId: socket.user.id,
-          firstName: socket.user.first_name,
-          lastName: socket.user.last_name,
+          firstName: socket.user.firstName,
+          lastName: socket.user.lastName,
         });
       }
     });

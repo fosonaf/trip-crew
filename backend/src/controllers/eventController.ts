@@ -1,57 +1,106 @@
 import { Request, Response } from 'express';
-import pool from '../config/database';
 import QRCode from 'qrcode';
+import prisma from '../config/prisma';
+
+const parseDate = (value?: string | null): Date | null => {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.valueOf()) ? null : date;
+};
+
+const toBoolean = (value: unknown): boolean => {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === 'true') return true;
+    if (normalized === 'false') return false;
+  }
+  if (typeof value === 'number') {
+    return value === 1;
+  }
+  return Boolean(value);
+};
 
 export const createEvent = async (req: Request, res: Response): Promise<void> => {
   try {
     const { name, description, startDate, endDate, location, isPaid, price } = req.body;
     const userId = req.user?.id;
 
-    const eventResult = await pool.query(
-      `INSERT INTO events (name, description, start_date, end_date, location, is_paid, price, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-       RETURNING *`,
-      [name, description, startDate, endDate, location, isPaid, price, userId]
-    );
+    if (!userId) {
+      res.status(401).json({ error: 'Not authenticated' });
+      return;
+    }
 
-    const event = eventResult.rows[0];
+    const normalizedPrice =
+      price === undefined || price === null || Number.isNaN(Number(price))
+        ? null
+        : Number(price);
+
+    const event = await prisma.event.create({
+      data: {
+        name,
+        description: description ?? null,
+        startDate: parseDate(startDate),
+        endDate: parseDate(endDate),
+        location: location ?? null,
+        isPaid: toBoolean(isPaid),
+        price: normalizedPrice,
+        createdBy: userId,
+      },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        startDate: true,
+        endDate: true,
+        location: true,
+        isPaid: true,
+        price: true,
+        createdBy: true,
+      },
+    });
 
     const qrData = JSON.stringify({
       eventId: event.id,
-      userId: userId,
+      userId,
       memberId: null,
     });
     const qrCode = await QRCode.toDataURL(qrData);
 
-    const memberResult = await pool.query(
-      `INSERT INTO event_members (event_id, user_id, role, payment_status, status, qr_code)
-       VALUES ($1, $2, 'organizer', 'paid', 'active', $3)
-       RETURNING id`,
-      [event.id, userId, qrCode]
-    );
+    const member = await prisma.eventMember.create({
+      data: {
+        eventId: event.id,
+        userId,
+        role: 'organizer',
+        paymentStatus: 'paid',
+        status: 'active',
+        qrCode,
+      },
+      select: { id: true },
+    });
 
     const updatedQrData = JSON.stringify({
       eventId: event.id,
-      userId: userId,
-      memberId: memberResult.rows[0].id,
+      userId,
+      memberId: member.id,
     });
     const updatedQrCode = await QRCode.toDataURL(updatedQrData);
 
-    await pool.query(
-      'UPDATE event_members SET qr_code = $1 WHERE id = $2',
-      [updatedQrCode, memberResult.rows[0].id]
-    );
+    await prisma.eventMember.update({
+      where: { id: member.id },
+      data: { qrCode: updatedQrCode },
+    });
 
     res.status(201).json({
       id: event.id,
       name: event.name,
       description: event.description,
-      startDate: event.start_date,
-      endDate: event.end_date,
+      startDate: event.startDate,
+      endDate: event.endDate,
       location: event.location,
-      isPaid: event.is_paid,
-      price: event.price,
-      createdBy: event.created_by,
+      isPaid: event.isPaid,
+      price: event.price ? Number(event.price) : null,
+      createdBy: event.createdBy,
     });
   } catch (error) {
     console.error('Create event error:', error);
@@ -63,36 +112,61 @@ export const getEvents = async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = req.user?.id;
 
-    const result = await pool.query(
-      `SELECT DISTINCT e.*, em.role, em.payment_status, em.status, em.id AS member_id,
-              (
-                SELECT COUNT(*) 
-                FROM event_members em2 
-                WHERE em2.event_id = e.id 
-                  AND em2.role = 'organizer' 
-                  AND em2.status = 'active'
-              ) AS organizer_count
-       FROM events e
-       INNER JOIN event_members em ON e.id = em.event_id
-       WHERE em.user_id = $1 AND em.status = 'active'
-       ORDER BY e.created_at DESC`,
-      [userId]
-    );
+    if (!userId) {
+      res.json([]);
+      return;
+    }
 
-    const events = result.rows.map(row => ({
-      id: Number(row.id),
-      name: row.name,
-      description: row.description,
-      startDate: row.start_date,
-      endDate: row.end_date,
-      location: row.location,
-      isPaid: row.is_paid,
-      price: row.price,
-      role: row.role,
-      paymentStatus: row.payment_status,
-      status: row.status,
-      memberId: Number(row.member_id),
-      organizerCount: Number(row.organizer_count ?? 0),
+    const memberships = await prisma.eventMember.findMany({
+      where: {
+        userId,
+        status: 'active',
+      },
+      include: {
+        event: true,
+      },
+      orderBy: {
+        event: { createdAt: 'desc' },
+      },
+    });
+
+    const eventIds = memberships.map((membership) => membership.eventId);
+
+    const organizerGroups =
+      eventIds.length === 0
+        ? []
+        : await prisma.eventMember.groupBy({
+            by: ['eventId'],
+            where: {
+              eventId: { in: eventIds },
+              role: 'organizer',
+              status: 'active',
+            },
+            _count: { eventId: true },
+          });
+
+    type OrganizerGroup = (typeof organizerGroups)[number];
+    const organizerCountMap = new Map<number, number>();
+    organizerGroups.forEach((group: OrganizerGroup) => {
+      organizerCountMap.set(group.eventId, group._count.eventId);
+    });
+
+    type MembershipWithEvent = (typeof memberships)[number];
+
+    const events = memberships.map((membership: MembershipWithEvent) => ({
+      id: membership.event.id,
+      name: membership.event.name,
+      description: membership.event.description,
+      startDate: membership.event.startDate,
+      endDate: membership.event.endDate,
+      location: membership.event.location,
+      isPaid: membership.event.isPaid,
+      price: membership.event.price ? Number(membership.event.price) : null,
+      role: membership.role,
+      paymentStatus: membership.paymentStatus,
+      status: membership.status,
+      memberId: membership.id,
+      organizerCount: organizerCountMap.get(membership.eventId) ?? 0,
     }));
 
     res.json(events);
@@ -107,46 +181,59 @@ export const getEventById = async (req: Request, res: Response): Promise<void> =
     const { eventId } = req.params;
     const userId = req.user?.id;
 
-    const memberCheck = await pool.query(
-      "SELECT id, role FROM event_members WHERE event_id = $1 AND user_id = $2 AND status = 'active'",
-      [eventId, userId]
-    );
+    const membership = await prisma.eventMember.findFirst({
+      where: {
+        eventId: Number(eventId),
+        userId,
+        status: 'active',
+      },
+      select: {
+        id: true,
+        role: true,
+      },
+    });
 
-    if (memberCheck.rows.length === 0) {
+    if (!membership) {
       res.status(403).json({ error: 'Access denied' });
       return;
     }
 
-    const isOrganizer = memberCheck.rows[0].role === 'organizer';
+    const isOrganizer = membership.role === 'organizer';
 
-    const eventResult = await pool.query(
-      `SELECT e.*, u.first_name, u.last_name
-       FROM events e
-       JOIN users u ON e.created_by = u.id
-       WHERE e.id = $1`,
-      [eventId]
-    );
+    const event = await prisma.event.findUnique({
+      where: { id: Number(eventId) },
+      include: {
+        creator: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+        members: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+                phone: true,
+                avatarUrl: true,
+              },
+            },
+          },
+        },
+        steps: {
+          orderBy: { scheduledTime: 'asc' },
+        },
+      },
+    });
 
-    if (eventResult.rows.length === 0) {
+    if (!event) {
       res.status(404).json({ error: 'Event not found' });
       return;
     }
-
-    const event = eventResult.rows[0];
-
-    const membersResult = await pool.query(
-      `SELECT em.id, em.role, em.payment_status, em.status, em.invited_by,
-              u.id as user_id, u.first_name, u.last_name, u.email, u.phone, u.avatar_url
-       FROM event_members em
-       JOIN users u ON em.user_id = u.id
-       WHERE em.event_id = $1`,
-      [eventId]
-    );
-
-    const stepsResult = await pool.query(
-      `SELECT * FROM event_steps WHERE event_id = $1 ORDER BY scheduled_time`,
-      [eventId]
-    );
 
     let joinRequests: Array<{
       id: number;
@@ -160,63 +247,81 @@ export const getEventById = async (req: Request, res: Response): Promise<void> =
     }> = [];
 
     if (isOrganizer) {
-      const joinRequestsResult = await pool.query(
-        `SELECT jr.id, jr.created_at, u.id as user_id, u.first_name, u.last_name, u.email, u.phone, u.avatar_url
-         FROM event_join_requests jr
-         JOIN users u ON jr.user_id = u.id
-         WHERE jr.event_id = $1 AND jr.status = 'pending'
-         ORDER BY jr.created_at ASC`,
-        [eventId]
-      );
+      const pendingRequests = await prisma.eventJoinRequest.findMany({
+        where: {
+          eventId: Number(eventId),
+          status: 'pending',
+        },
+        orderBy: { createdAt: 'asc' },
+        include: {
+          user: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              phone: true,
+              avatarUrl: true,
+            },
+          },
+        },
+      });
 
-      joinRequests = joinRequestsResult.rows.map((row) => ({
-        id: Number(row.id),
-        userId: Number(row.user_id),
-        firstName: row.first_name as string,
-        lastName: row.last_name as string,
-        email: row.email as string | null,
-        phone: row.phone as string | null,
-        avatarUrl: row.avatar_url as string | null,
-        requestedAt: new Date(row.created_at).toISOString(),
+      type PendingRequest = (typeof pendingRequests)[number];
+      joinRequests = pendingRequests.map((request: PendingRequest) => ({
+        id: request.id,
+        userId: request.user.id,
+        firstName: request.user.firstName,
+        lastName: request.user.lastName,
+        email: request.user.email,
+        phone: request.user.phone,
+        avatarUrl: request.user.avatarUrl,
+        requestedAt: request.createdAt.toISOString(),
       }));
     }
+
+    type EventMemberWithUser = (typeof event.members)[number];
+    const members = event.members.map((member: EventMemberWithUser) => ({
+      id: member.id,
+      userId: member.user.id,
+      firstName: member.user.firstName,
+      lastName: member.user.lastName,
+      email: member.user.email,
+      phone: member.user.phone,
+      role: member.role,
+      paymentStatus: member.paymentStatus,
+      status: member.status,
+      invitedBy: member.invitedBy,
+      avatarUrl: member.user.avatarUrl,
+    }));
+
+    type EventStepData = (typeof event.steps)[number];
+    const steps = event.steps.map((step: EventStepData) => ({
+      id: step.id,
+      name: step.name,
+      description: step.description,
+      location: step.location,
+      scheduledTime: step.scheduledTime,
+      alertBeforeMinutes: step.alertBeforeMinutes,
+    }));
 
     res.json({
       id: event.id,
       name: event.name,
       description: event.description,
-      startDate: event.start_date,
-      endDate: event.end_date,
+      startDate: event.startDate,
+      endDate: event.endDate,
       location: event.location,
-      isPaid: event.is_paid,
-      price: event.price,
+      isPaid: event.isPaid,
+      price: event.price ? Number(event.price) : null,
       createdBy: {
-        id: event.created_by,
-        firstName: event.first_name,
-        lastName: event.last_name,
+        id: event.creator.id,
+        firstName: event.creator.firstName,
+        lastName: event.creator.lastName,
       },
-      members: membersResult.rows.map(m => ({
-        id: m.id,
-        userId: m.user_id,
-        firstName: m.first_name,
-        lastName: m.last_name,
-        email: m.email,
-        phone: m.phone,
-        role: m.role,
-        paymentStatus: m.payment_status,
-        status: m.status,
-        invitedBy: m.invited_by,
-        avatarUrl: m.avatar_url,
-      })),
-      steps: stepsResult.rows.map(s => ({
-        id: s.id,
-        name: s.name,
-        description: s.description,
-        location: s.location,
-        scheduledTime: s.scheduled_time,
-        alertBeforeMinutes: s.alert_before_minutes,
-      })),
-      joinRequests: joinRequests,
+      members,
+      steps,
+      joinRequests,
       joinRequestCount: joinRequests.length,
     });
   } catch (error) {
@@ -230,16 +335,26 @@ export const updateEvent = async (req: Request, res: Response): Promise<void> =>
     const { eventId } = req.params;
     const { name, description, startDate, endDate, location, isPaid, price } = req.body;
 
-    const result = await pool.query(
-      `UPDATE events 
-       SET name = $1, description = $2, start_date = $3, end_date = $4, 
-           location = $5, is_paid = $6, price = $7, updated_at = CURRENT_TIMESTAMP
-       WHERE id = $8
-       RETURNING *`,
-      [name, description, startDate, endDate, location, isPaid, price, eventId]
-    );
+    const normalizedPrice =
+      price === undefined || price === null || Number.isNaN(Number(price))
+        ? null
+        : Number(price);
 
-    if (result.rows.length === 0) {
+    const updated = await prisma.event.update({
+      where: { id: Number(eventId) },
+      data: {
+        name,
+        description: description ?? null,
+        startDate: parseDate(startDate),
+        endDate: parseDate(endDate),
+        location: location ?? null,
+        isPaid: toBoolean(isPaid),
+        price: normalizedPrice,
+      },
+      select: { id: true },
+    }).catch(() => null);
+
+    if (!updated) {
       res.status(404).json({ error: 'Event not found' });
       return;
     }
@@ -254,7 +369,9 @@ export const updateEvent = async (req: Request, res: Response): Promise<void> =>
 export const deleteEvent = async (req: Request, res: Response): Promise<void> => {
   try {
     const { eventId } = req.params;
-    await pool.query('DELETE FROM events WHERE id = $1', [eventId]);
+    await prisma.event.delete({
+      where: { id: Number(eventId) },
+    });
     res.json({ message: 'Event deleted successfully' });
   } catch (error) {
     console.error('Delete event error:', error);
