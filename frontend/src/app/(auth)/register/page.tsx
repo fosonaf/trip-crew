@@ -39,7 +39,7 @@ export default function RegisterPage() {
 
     try {
       const payload = {
-        email: form.email,
+        email: form.email.trim() || undefined,
         password: form.password,
         firstName: form.firstName,
         lastName: form.lastName,
@@ -101,14 +101,13 @@ export default function RegisterPage() {
         </label>
 
         <label className={styles.label}>
-          Email
+          Email (optionnel)
           <input
             className={styles.input}
             type="email"
             value={form.email}
             onChange={handleChange("email")}
             placeholder="alice@example.com"
-            required
             autoComplete="email"
           />
         </label>

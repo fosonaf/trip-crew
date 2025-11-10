@@ -12,7 +12,7 @@ import {
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useAuthContext } from "@/components/providers/AuthProvider";
-import { eventApi } from "@/lib/api";
+import { ApiError, eventApi } from "@/lib/api";
 import type { CreateStepPayload, EventDetail } from "@/types/event";
 import styles from "./page.module.css";
 
@@ -51,8 +51,12 @@ export default function EventDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [isStepModalOpen, setIsStepModalOpen] = useState(false);
   const [isMembersModalOpen, setIsMembersModalOpen] = useState(false);
+  const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [isSubmittingStep, setIsSubmittingStep] = useState(false);
   const [stepError, setStepError] = useState<string | null>(null);
+  const [isSendingInvitation, setIsSendingInvitation] = useState(false);
+  const [inviteError, setInviteError] = useState<string | null>(null);
+  const [invitePhone, setInvitePhone] = useState("");
   const [stepForm, setStepForm] = useState({
     name: "",
     description: "",
@@ -62,6 +66,34 @@ export default function EventDetailPage() {
   });
   const [toast, setToast] = useState<{ message: string; variant: "success" | "error" } | null>(null);
 
+  const fetchEvent = useCallback(
+    async (withSpinner = false) => {
+      if (!eventId) {
+        return;
+      }
+
+      if (withSpinner) {
+        setIsLoading(true);
+        setError(null);
+      }
+
+      try {
+        const data = await eventApi.detail(eventId);
+        setEvent(data);
+        setError(null);
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Impossible de charger le détail de l’évènement.";
+        setError(message);
+      } finally {
+        if (withSpinner) {
+          setIsLoading(false);
+        }
+      }
+    },
+    [eventId],
+  );
+
   useEffect(() => {
     if (isHydrated && !token) {
       router.replace("/login");
@@ -69,30 +101,12 @@ export default function EventDetailPage() {
   }, [isHydrated, token, router]);
 
   useEffect(() => {
-    if (!isHydrated || !token || !eventId) {
+    if (!isHydrated || !token) {
       return;
     }
 
-    const fetchEvent = async () => {
-      setIsLoading(true);
-      setError(null);
-
-      try {
-        const data = await eventApi.detail(eventId);
-        setEvent(data);
-      } catch (err) {
-        const message =
-          err instanceof Error
-            ? err.message
-            : "Impossible de charger le détail de l’évènement.";
-        setError(message);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchEvent();
-  }, [isHydrated, token, eventId]);
+    fetchEvent(true);
+  }, [isHydrated, token, fetchEvent]);
 
   const organizerName = useMemo(() => {
     if (!event) return "";
@@ -120,6 +134,16 @@ export default function EventDetailPage() {
       alertBeforeMinutes: "30",
     });
     setStepError(null);
+  };
+
+  const handleInviteInputChange = (event: ChangeEvent<HTMLInputElement>) => {
+    setInvitePhone(event.target.value);
+  };
+
+  const openInviteModal = () => {
+    setInvitePhone("");
+    setInviteError(null);
+    setIsInviteModalOpen(true);
   };
 
   const closeStepModal = useCallback(() => {
@@ -190,6 +214,45 @@ export default function EventDetailPage() {
     }
   };
 
+  const handleInviteCancel = () => {
+    setInvitePhone("");
+    setInviteError(null);
+    setIsInviteModalOpen(false);
+  };
+
+  const handleInviteSubmit = async (evt: FormEvent<HTMLFormElement>) => {
+    evt.preventDefault();
+    setInviteError(null);
+
+    if (!invitePhone.trim()) {
+      setInviteError("Merci de renseigner le numéro de téléphone du membre à inviter.");
+      return;
+    }
+
+    setIsSendingInvitation(true);
+
+    try {
+      await eventApi.invite(eventId, { phone: invitePhone.trim() });
+      await fetchEvent(false);
+      setToast({ message: "Invitation envoyée.", variant: "success" });
+      handleInviteCancel();
+    } catch (err) {
+      const message =
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : "Impossible d’envoyer l’invitation pour le moment.";
+      setInviteError(message);
+      setToast({
+        message,
+        variant: "error",
+      });
+    } finally {
+      setIsSendingInvitation(false);
+    }
+  };
+
   useEffect(() => {
     if (!toast) return;
     const timeout = setTimeout(() => setToast(null), 4000);
@@ -205,6 +268,12 @@ export default function EventDetailPage() {
   const handleMembersOverlayClick = (evt: MouseEvent<HTMLDivElement>) => {
     if (evt.target === evt.currentTarget) {
       closeMembersModal();
+    }
+  };
+
+  const handleInviteOverlayClick = (evt: MouseEvent<HTMLDivElement>) => {
+    if (evt.target === evt.currentTarget) {
+      handleInviteCancel();
     }
   };
 
@@ -234,13 +303,23 @@ export default function EventDetailPage() {
                 Voir les membres
               </button>
               {isOrganizer ? (
-                <button
-                  type="button"
-                  className={styles.primaryAction}
-                  onClick={() => setIsStepModalOpen(true)}
-                >
-                  Ajouter une étape
-                </button>
+                <>
+                  <button
+                    type="button"
+                    className={styles.ghostAction}
+                    onClick={openInviteModal}
+                    disabled={!event}
+                  >
+                    Inviter un membre
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.primaryAction}
+                    onClick={() => setIsStepModalOpen(true)}
+                  >
+                    Ajouter une étape
+                  </button>
+                </>
               ) : null}
             </div>
           </div>
@@ -440,13 +519,21 @@ export default function EventDetailPage() {
             ) : (
               <div className={styles.membersGrid}>
                 {event.members.map((member) => (
-                  <div key={member.id} className={styles.memberCard}>
+                  <div
+                    key={member.id}
+                    className={`${styles.memberCard} ${
+                      member.status === "pending" ? styles.memberCardPending : ""
+                    }`}
+                  >
                     <div className={styles.memberHeader}>
                       <h3 className={styles.memberName}>
                         {member.firstName} {member.lastName}
                       </h3>
                       {member.role === "organizer" ? (
                         <span className={styles.roleTag}>Organisateur</span>
+                      ) : null}
+                      {member.status === "pending" ? (
+                        <span className={styles.memberStatusBadge}>En attente</span>
                       ) : null}
                     </div>
                     <p className={styles.memberContact}>
@@ -462,6 +549,55 @@ export default function EventDetailPage() {
                 ))}
               </div>
             )}
+          </div>
+        </div>
+      ) : null}
+
+      {isOrganizer && isInviteModalOpen ? (
+        <div className={styles.modalOverlay} onClick={handleInviteOverlayClick}>
+          <div className={styles.modalContent} role="dialog" aria-modal="true">
+            <header className={styles.modalHeader}>
+              <h2 className={styles.modalTitle}>Inviter un membre</h2>
+              <button type="button" className={styles.closeButton} onClick={handleInviteCancel}>
+                ×
+              </button>
+            </header>
+            <form className={styles.stepForm} onSubmit={handleInviteSubmit} noValidate>
+              {inviteError ? <div className={styles.stepFormError}>{inviteError}</div> : null}
+              <div className={styles.stepFormRow}>
+                <div className={styles.field}>
+                  <label htmlFor="invite-phone" className={styles.label}>
+                    Numéro de téléphone
+                  </label>
+                  <input
+                    id="invite-phone"
+                    name="invite-phone"
+                    type="tel"
+                    className={styles.input}
+                    placeholder="+33600000000"
+                    value={invitePhone}
+                    onChange={handleInviteInputChange}
+                    required
+                  />
+                  <span className={styles.helper}>
+                    Le contact doit déjà disposer d’un compte Trip Crew pour recevoir l’invitation.
+                  </span>
+                </div>
+              </div>
+              <div className={styles.stepFormActions}>
+                <button
+                  type="button"
+                  className={styles.secondaryAction}
+                  onClick={handleInviteCancel}
+                  disabled={isSendingInvitation}
+                >
+                  Annuler
+                </button>
+                <button type="submit" className={styles.primaryAction} disabled={isSendingInvitation}>
+                  {isSendingInvitation ? "Envoi..." : "Envoyer l’invitation"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       ) : null}

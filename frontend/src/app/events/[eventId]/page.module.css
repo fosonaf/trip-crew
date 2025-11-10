@@ -167,9 +167,9 @@
 }
 
 .membersGrid {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 16px;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
 }
 
 .memberCard {
@@ -179,6 +179,12 @@
   background-color: rgba(15, 23, 42, 0.28);
   display: grid;
   gap: 12px;
+}
+
+.memberCardPending {
+  opacity: 0.7;
+  background-color: rgba(15, 23, 42, 0.18);
+  border-style: dashed;
 }
 
 .memberHeader {
@@ -204,6 +210,16 @@
   background-color: rgba(59, 130, 246, 0.2);
   font-weight: 600;
   font-size: 0.9rem;
+}
+
+.memberStatusBadge {
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(148, 163, 184, 0.12);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary);
 }
 
 .memberEmail {
@@ -307,6 +323,11 @@
   background-color: rgba(248, 113, 113, 0.12);
   color: var(--danger);
   font-weight: 500;
+}
+
+.helper {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
 }
 
 .stepCard {

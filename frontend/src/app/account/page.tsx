@@ -176,7 +176,7 @@ export default function AccountPage() {
 
           <div className={styles.fieldset}>
             <label className={styles.label} htmlFor="email">
-              Email
+              Email (optionnel)
               <input
                 id="email"
                 type="email"
@@ -184,7 +184,6 @@ export default function AccountPage() {
                 value={form.email}
                 onChange={handleInputChange("email")}
                 autoComplete="email"
-                required
               />
             </label>
 

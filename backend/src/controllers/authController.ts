@@ -12,14 +12,29 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const existingUser = await pool.query(
-      'SELECT id FROM users WHERE email = $1',
-      [email]
+    const normalizedPhone = phone.trim();
+
+    const phoneExists = await pool.query(
+      'SELECT id FROM users WHERE phone = $1',
+      [normalizedPhone]
     );
 
-    if (existingUser.rows.length > 0) {
-      res.status(400).json({ error: 'Email already registered' });
+    if (phoneExists.rows.length > 0) {
+      res.status(400).json({ error: 'Phone number already registered' });
       return;
+    }
+
+    let normalizedEmail: string | null = null;
+    if (email && email.trim()) {
+      normalizedEmail = email.trim().toLowerCase();
+      const existingEmail = await pool.query(
+        'SELECT id FROM users WHERE email = $1',
+        [normalizedEmail]
+      );
+      if (existingEmail.rows.length > 0) {
+        res.status(400).json({ error: 'Email already registered' });
+        return;
+      }
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -28,7 +43,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       `INSERT INTO users (email, password, first_name, last_name, phone, avatar_url) 
        VALUES ($1, $2, $3, $4, $5, $6) 
        RETURNING id, email, first_name, last_name, phone, avatar_url`,
-      [email, hashedPassword, firstName, lastName, phone.trim(), avatarUrl ?? null]
+      [normalizedEmail, hashedPassword, firstName, lastName, normalizedPhone, avatarUrl ?? null]
     );
 
     const user = result.rows[0];
@@ -53,11 +68,16 @@ export const register = async (req: Request, res: Response): Promise<void> => {
 
 export const login = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { email, password } = req.body;
+    const { phone, password } = req.body;
+
+    if (!phone || !phone.trim()) {
+      res.status(400).json({ error: 'Phone number is required' });
+      return;
+    }
 
     const result = await pool.query(
-      'SELECT * FROM users WHERE email = $1',
-      [email]
+      'SELECT * FROM users WHERE phone = $1',
+      [phone.trim()]
     );
 
     if (result.rows.length === 0) {
@@ -136,17 +156,6 @@ export const updateProfile = async (req: Request, res: Response): Promise<void> 
       return;
     }
 
-    if (email) {
-      const existingEmail = await pool.query(
-        'SELECT id FROM users WHERE email = $1 AND id <> $2',
-        [email, userId]
-      );
-      if (existingEmail.rows.length > 0) {
-        res.status(400).json({ error: 'Email already in use' });
-        return;
-      }
-    }
-
     const current = await pool.query(
       'SELECT email, first_name, last_name, phone, avatar_url FROM users WHERE id = $1',
       [userId]
@@ -157,7 +166,46 @@ export const updateProfile = async (req: Request, res: Response): Promise<void> 
       return;
     }
 
-    const existing = current.rows[0];
+    const existing = current.rows[0] as {
+      email: string | null;
+      first_name: string;
+      last_name: string;
+      phone: string;
+      avatar_url: string | null;
+    };
+
+    let normalizedEmail: string | null | undefined = undefined;
+    if (email !== undefined) {
+      const trimmedEmail = email.trim();
+      if (trimmedEmail) {
+        normalizedEmail = trimmedEmail.toLowerCase();
+        const existingEmail = await pool.query(
+          'SELECT id FROM users WHERE email = $1 AND id <> $2',
+          [normalizedEmail, userId]
+        );
+        if (existingEmail.rows.length > 0) {
+          res.status(400).json({ error: 'Email already in use' });
+          return;
+        }
+      } else {
+        normalizedEmail = null;
+      }
+    }
+
+    let normalizedPhone: string | undefined = undefined;
+    if (phone !== undefined) {
+      normalizedPhone = phone.trim();
+      if (normalizedPhone !== existing.phone) {
+        const existingPhone = await pool.query(
+          'SELECT id FROM users WHERE phone = $1 AND id <> $2',
+          [normalizedPhone, userId]
+        );
+        if (existingPhone.rows.length > 0) {
+          res.status(400).json({ error: 'Phone number already in use' });
+          return;
+        }
+      }
+    }
 
     const updated = await pool.query(
       `UPDATE users
@@ -170,10 +218,10 @@ export const updateProfile = async (req: Request, res: Response): Promise<void> 
        WHERE id = $6
        RETURNING id, email, first_name, last_name, phone, avatar_url`,
       [
-        email ?? existing.email,
+        normalizedEmail !== undefined ? normalizedEmail : existing.email,
         firstName ?? existing.first_name,
         lastName ?? existing.last_name,
-        phone !== undefined ? phone.trim() : existing.phone,
+        normalizedPhone ?? existing.phone,
         avatarUrl ?? existing.avatar_url,
         userId,
       ]

@@ -1,6 +1,6 @@
 export interface User {
   id: number;
-  email: string;
+  email: string | null;
   password: string;
   first_name: string;
   last_name: string;
@@ -30,6 +30,8 @@ export interface EventMember {
   user_id: number;
   role: 'organizer' | 'member';
   payment_status: 'pending' | 'paid' | 'refunded';
+  status: 'active' | 'pending';
+  invited_by?: number | null;
   qr_code?: string;
   joined_at: Date;
 }

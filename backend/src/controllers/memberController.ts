@@ -18,41 +18,23 @@ export const joinEvent = async (req: Request, res: Response): Promise<void> => {
     }
 
     const memberCheck = await pool.query(
-      'SELECT id FROM event_members WHERE event_id = $1 AND user_id = $2',
+      'SELECT id, status FROM event_members WHERE event_id = $1 AND user_id = $2',
       [eventId, userId]
     );
 
     if (memberCheck.rows.length > 0) {
+      const existing = memberCheck.rows[0];
+      if (existing.status === 'pending') {
+        await activatePendingMember(existing.id, Number(eventId), userId!);
+        res.status(200).json({ message: 'Invitation accepted', memberId: existing.id });
+        return;
+      }
+
       res.status(400).json({ error: 'Already a member of this event' });
       return;
     }
 
-    const qrData = JSON.stringify({
-      eventId: eventId,
-      userId: userId,
-      memberId: null,
-    });
-    const qrCode = await QRCode.toDataURL(qrData);
-
-    const result = await pool.query(
-      `INSERT INTO event_members (event_id, user_id, role, qr_code)
-       VALUES ($1, $2, 'member', $3)
-       RETURNING id`,
-      [eventId, userId, qrCode]
-    );
-
-    const memberId = result.rows[0].id;
-    const updatedQrData = JSON.stringify({
-      eventId: eventId,
-      userId: userId,
-      memberId: memberId,
-    });
-    const updatedQrCode = await QRCode.toDataURL(updatedQrData);
-
-    await pool.query(
-      'UPDATE event_members SET qr_code = $1 WHERE id = $2',
-      [updatedQrCode, memberId]
-    );
+    const memberId = await createActiveMember(Number(eventId), userId!);
 
     res.status(201).json({ message: 'Successfully joined event', memberId });
   } catch (error) {
@@ -139,4 +121,237 @@ export const getMemberQRCode = async (req: Request, res: Response): Promise<void
     console.error('Get QR code error:', error);
     res.status(500).json({ error: 'Failed to get QR code' });
   }
+};
+
+export const inviteMember = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { eventId } = req.params;
+    const { phone } = req.body as { phone?: string };
+    const organizerId = req.user?.id;
+
+    if (!organizerId) {
+      res.status(401).json({ error: 'Not authenticated' });
+      return;
+    }
+
+    if (!phone || !phone.trim()) {
+      res.status(400).json({ error: 'Phone number is required' });
+      return;
+    }
+
+    const eventResult = await pool.query(
+      'SELECT id FROM events WHERE id = $1',
+      [eventId]
+    );
+
+    if (eventResult.rows.length === 0) {
+      res.status(404).json({ error: 'Event not found' });
+      return;
+    }
+
+    const userResult = await pool.query(
+      'SELECT id FROM users WHERE phone = $1',
+      [phone.trim()]
+    );
+
+    if (userResult.rows.length === 0) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    const invitedUserId = userResult.rows[0].id as number;
+
+    if (invitedUserId === organizerId) {
+      res.status(400).json({ error: 'You are already part of this event' });
+      return;
+    }
+
+    const existing = await pool.query(
+      'SELECT id, status FROM event_members WHERE event_id = $1 AND user_id = $2',
+      [eventId, invitedUserId]
+    );
+
+    if (existing.rows.length > 0) {
+      const member = existing.rows[0];
+      if (member.status === 'pending') {
+        res.status(200).json({ message: 'Invitation already pending', memberId: member.id });
+        return;
+      }
+
+      res.status(400).json({ error: 'User already a member of this event' });
+      return;
+    }
+
+    const result = await pool.query(
+      `INSERT INTO event_members (event_id, user_id, role, payment_status, status, invited_by)
+       VALUES ($1, $2, 'member', 'pending', 'pending', $3)
+       RETURNING id`,
+      [eventId, invitedUserId, organizerId]
+    );
+
+    res.status(201).json({ message: 'Invitation sent successfully', memberId: result.rows[0].id });
+  } catch (error) {
+    console.error('Invite member error:', error);
+    res.status(500).json({ error: 'Failed to invite member' });
+  }
+};
+
+export const listPendingInvitations = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      res.status(401).json({ error: 'Not authenticated' });
+      return;
+    }
+
+    const result = await pool.query(
+      `SELECT 
+         em.id,
+         em.event_id,
+         em.invited_by,
+         e.name AS event_name,
+         e.start_date,
+         u.first_name AS inviter_first_name,
+         u.last_name AS inviter_last_name
+       FROM event_members em
+       JOIN events e ON em.event_id = e.id
+       LEFT JOIN users u ON em.invited_by = u.id
+       WHERE em.user_id = $1 AND em.status = 'pending'
+       ORDER BY em.joined_at DESC`,
+      [userId]
+    );
+
+    const invitations = result.rows.map((row) => ({
+      memberId: Number(row.id),
+      eventId: Number(row.event_id),
+      eventName: row.event_name as string,
+      startDate: row.start_date ? new Date(row.start_date).toISOString() : null,
+      invitedBy: row.invited_by ? Number(row.invited_by) : null,
+      inviter: row.inviter_first_name
+        ? `${row.inviter_first_name} ${row.inviter_last_name ?? ''}`.trim()
+        : null,
+    }));
+
+    res.json(invitations);
+  } catch (error) {
+    console.error('List pending invitations error:', error);
+    res.status(500).json({ error: 'Failed to list invitations' });
+  }
+};
+
+export const acceptInvitation = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { memberId } = req.params;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      res.status(401).json({ error: 'Not authenticated' });
+      return;
+    }
+
+    const memberResult = await pool.query(
+      'SELECT event_id, status FROM event_members WHERE id = $1 AND user_id = $2',
+      [memberId, userId]
+    );
+
+    if (memberResult.rows.length === 0) {
+      res.status(404).json({ error: 'Invitation not found' });
+      return;
+    }
+
+    const member = memberResult.rows[0];
+
+    if (member.status !== 'pending') {
+      res.status(400).json({ error: 'Invitation already processed' });
+      return;
+    }
+
+    await activatePendingMember(Number(memberId), Number(member.event_id), userId);
+
+    res.json({ message: 'Invitation accepted', eventId: Number(member.event_id) });
+  } catch (error) {
+    console.error('Accept invitation error:', error);
+    res.status(500).json({ error: 'Failed to accept invitation' });
+  }
+};
+
+export const declineInvitation = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { memberId } = req.params;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      res.status(401).json({ error: 'Not authenticated' });
+      return;
+    }
+
+    const memberResult = await pool.query(
+      "SELECT status FROM event_members WHERE id = $1 AND user_id = $2",
+      [memberId, userId]
+    );
+
+    if (memberResult.rows.length === 0) {
+      res.status(404).json({ error: 'Invitation not found' });
+      return;
+    }
+
+    if (memberResult.rows[0].status !== 'pending') {
+      res.status(400).json({ error: 'Invitation already processed' });
+      return;
+    }
+
+    await pool.query(
+      "DELETE FROM event_members WHERE id = $1 AND user_id = $2 AND status = 'pending'",
+      [memberId, userId]
+    );
+
+    res.json({ message: 'Invitation declined' });
+  } catch (error) {
+    console.error('Decline invitation error:', error);
+    res.status(500).json({ error: 'Failed to decline invitation' });
+  }
+};
+
+const createActiveMember = async (eventId: number, userId: number): Promise<number> => {
+  const qrData = JSON.stringify({
+    eventId,
+    userId,
+    memberId: null,
+  });
+  const qrCode = await QRCode.toDataURL(qrData);
+
+  const result = await pool.query(
+    `INSERT INTO event_members (event_id, user_id, role, payment_status, status, qr_code)
+     VALUES ($1, $2, 'member', 'pending', 'active', $3)
+     RETURNING id`,
+    [eventId, userId, qrCode]
+  );
+
+  const memberId = Number(result.rows[0].id);
+  await updateMemberQRCode(memberId, eventId, userId);
+  return memberId;
+};
+
+const activatePendingMember = async (memberId: number, eventId: number, userId: number): Promise<void> => {
+  await updateMemberQRCode(memberId, eventId, userId);
+  await pool.query(
+    `UPDATE event_members 
+     SET status = 'active', updated_at = CURRENT_TIMESTAMP 
+     WHERE id = $1`,
+    [memberId]
+  );
+};
+
+const updateMemberQRCode = async (memberId: number, eventId: number, userId: number): Promise<void> => {
+  const updatedQrData = JSON.stringify({
+    eventId,
+    userId,
+    memberId,
+  });
+  const updatedQrCode = await QRCode.toDataURL(updatedQrData);
+
+  await pool.query(
+    'UPDATE event_members SET qr_code = $1 WHERE id = $2',
+    [updatedQrCode, memberId]
+  );
 };

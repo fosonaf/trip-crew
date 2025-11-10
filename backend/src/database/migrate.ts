@@ -7,11 +7,11 @@ const createTables = async (): Promise<void> => {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
-        email VARCHAR(255) UNIQUE NOT NULL,
+        email VARCHAR(255) UNIQUE,
         password VARCHAR(255) NOT NULL,
         first_name VARCHAR(100) NOT NULL,
         last_name VARCHAR(100) NOT NULL,
-        phone VARCHAR(20),
+        phone VARCHAR(20) NOT NULL,
         avatar_url TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -21,6 +21,17 @@ const createTables = async (): Promise<void> => {
 
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT`);
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(20)`);
+    await pool.query(`UPDATE users SET phone = CONCAT('TMP-', id) WHERE phone IS NULL OR phone = ''`);
+    await pool.query(`ALTER TABLE users ALTER COLUMN email DROP NOT NULL`);
+    await pool.query(`ALTER TABLE users ALTER COLUMN phone SET NOT NULL`);
+    await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS users_phone_unique_idx ON users(phone)`);
+
+    await pool.query(`ALTER TABLE event_members ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'active'`);
+    await pool.query(`UPDATE event_members SET status = 'active' WHERE status IS NULL`);
+    await pool.query(`ALTER TABLE event_members ALTER COLUMN status SET NOT NULL`);
+    await pool.query(`ALTER TABLE event_members ADD COLUMN IF NOT EXISTS invited_by INTEGER REFERENCES users(id)`);
+    await pool.query(`ALTER TABLE event_members ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS event_members_status_idx ON event_members(status)`);
 
     await pool.query(`
       CREATE TABLE IF NOT EXISTS events (

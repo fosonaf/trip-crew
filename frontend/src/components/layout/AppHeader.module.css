@@ -57,6 +57,162 @@
   gap: 16px;
 }
 
+.notifications {
+  position: relative;
+}
+
+.notificationsButton {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(59, 130, 246, 0.35);
+  background-color: rgba(59, 130, 246, 0.15);
+  color: var(--text-primary);
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 150ms ease, box-shadow 150ms ease;
+}
+
+.notificationsButton:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 26px rgba(59, 130, 246, 0.25);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(248, 113, 113, 0.9);
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.dropdown {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 12px);
+  width: 300px;
+  padding: 18px 20px;
+  border-radius: 18px;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  background: rgba(15, 23, 42, 0.95);
+  box-shadow:
+    0 18px 36px rgba(2, 6, 23, 0.5),
+    0 12px 24px rgba(37, 99, 235, 0.2);
+  display: grid;
+  gap: 12px;
+  z-index: 60;
+}
+
+.dropdownHeader {
+  display: grid;
+  gap: 4px;
+}
+
+.dropdownHeader h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.dropdownHint {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.dropdownPlaceholder {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.dropdownError {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(248, 113, 113, 0.18);
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  color: var(--danger);
+  font-size: 0.9rem;
+}
+
+.invitationList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.invitationItem {
+  display: grid;
+  gap: 8px;
+}
+
+.invitationMeta {
+  display: grid;
+  gap: 4px;
+}
+
+.invitationEvent {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.invitationSender {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.invitationActions {
+  display: flex;
+  gap: 8px;
+}
+
+.invitationActionButton {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 150ms ease, box-shadow 150ms ease, opacity 120ms ease;
+}
+
+.invitationActionButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.invitationActionButton:not(:disabled):hover {
+  transform: translateY(-1px);
+}
+
+.invitationActionAccept {
+  border-color: rgba(34, 197, 94, 0.45);
+  background-color: rgba(34, 197, 94, 0.18);
+  color: rgba(34, 197, 94, 1);
+  box-shadow: 0 12px 24px rgba(34, 197, 94, 0.18);
+}
+
+.invitationActionDecline {
+  border-color: rgba(248, 113, 113, 0.45);
+  background-color: rgba(248, 113, 113, 0.2);
+  color: rgba(248, 113, 113, 1);
+  box-shadow: 0 12px 24px rgba(248, 113, 113, 0.18);
+}
+
 .logout {
   border: 1px solid rgba(248, 113, 113, 0.35);
   background-color: rgba(248, 113, 113, 0.1);
@@ -120,6 +276,11 @@
 
   .actions {
     gap: 12px;
+  }
+
+  .dropdown {
+    right: -30px;
+    width: calc(100vw - 40px);
   }
 }
 

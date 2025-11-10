@@ -24,8 +24,8 @@ export const createEvent = async (req: Request, res: Response): Promise<void> =>
     const qrCode = await QRCode.toDataURL(qrData);
 
     const memberResult = await pool.query(
-      `INSERT INTO event_members (event_id, user_id, role, payment_status, qr_code)
-       VALUES ($1, $2, 'organizer', 'paid', $3)
+      `INSERT INTO event_members (event_id, user_id, role, payment_status, status, qr_code)
+       VALUES ($1, $2, 'organizer', 'paid', 'active', $3)
        RETURNING id`,
       [event.id, userId, qrCode]
     );
@@ -64,10 +64,10 @@ export const getEvents = async (req: Request, res: Response): Promise<void> => {
     const userId = req.user?.id;
 
     const result = await pool.query(
-      `SELECT DISTINCT e.*, em.role, em.payment_status
+      `SELECT DISTINCT e.*, em.role, em.payment_status, em.status
        FROM events e
        INNER JOIN event_members em ON e.id = em.event_id
-       WHERE em.user_id = $1
+       WHERE em.user_id = $1 AND em.status = 'active'
        ORDER BY e.created_at DESC`,
       [userId]
     );
@@ -83,6 +83,7 @@ export const getEvents = async (req: Request, res: Response): Promise<void> => {
       price: row.price,
       role: row.role,
       paymentStatus: row.payment_status,
+      status: row.status,
     }));
 
     res.json(events);
@@ -98,7 +99,7 @@ export const getEventById = async (req: Request, res: Response): Promise<void> =
     const userId = req.user?.id;
 
     const memberCheck = await pool.query(
-      'SELECT id FROM event_members WHERE event_id = $1 AND user_id = $2',
+      "SELECT id FROM event_members WHERE event_id = $1 AND user_id = $2 AND status = 'active'",
       [eventId, userId]
     );
 
@@ -123,7 +124,7 @@ export const getEventById = async (req: Request, res: Response): Promise<void> =
     const event = eventResult.rows[0];
 
     const membersResult = await pool.query(
-      `SELECT em.id, em.role, em.payment_status,
+      `SELECT em.id, em.role, em.payment_status, em.status, em.invited_by,
               u.id as user_id, u.first_name, u.last_name, u.email, u.phone, u.avatar_url
        FROM event_members em
        JOIN users u ON em.user_id = u.id
@@ -159,6 +160,8 @@ export const getEventById = async (req: Request, res: Response): Promise<void> =
         phone: m.phone,
         role: m.role,
         paymentStatus: m.payment_status,
+        status: m.status,
+        invitedBy: m.invited_by,
         avatarUrl: m.avatar_url,
       })),
       steps: stepsResult.rows.map(s => ({

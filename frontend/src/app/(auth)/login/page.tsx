@@ -10,7 +10,7 @@ import styles from "../page.module.css";
 export default function LoginPage() {
   const router = useRouter();
   const { login } = useAuthContext();
-  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -21,13 +21,13 @@ export default function LoginPage() {
     setIsSubmitting(true);
 
     try {
-      const result = await authApi.login({ email, password });
+      const result = await authApi.login({ phone, password });
       login(result);
       router.replace("/events");
     } catch (err) {
       if (err instanceof ApiError) {
         if (err.status === 401) {
-          setError("Identifiants invalides. Vérifiez l’email ou le mot de passe.");
+          setError("Identifiants invalides. Vérifie le numéro de téléphone ou le mot de passe.");
         } else {
           setError(err.message);
         }
@@ -52,15 +52,15 @@ export default function LoginPage() {
 
       <form className={styles.form} onSubmit={handleSubmit} noValidate>
         <label className={styles.label}>
-          Email
+          Téléphone
           <input
             className={styles.input}
-            type="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            placeholder="alice@example.com"
+            type="tel"
+            value={phone}
+            onChange={(event) => setPhone(event.target.value)}
+            placeholder="+33600000000"
             required
-            autoComplete="email"
+            autoComplete="tel"
           />
         </label>
 

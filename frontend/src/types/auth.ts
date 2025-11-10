@@ -1,9 +1,9 @@
 export type User = {
   id: number;
-  email: string;
+  email: string | null;
   firstName: string;
   lastName: string;
-  phone: string | null;
+  phone: string;
   avatarUrl: string | null;
 };
 

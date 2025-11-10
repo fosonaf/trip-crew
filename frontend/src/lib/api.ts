@@ -6,6 +6,7 @@ import type {
   EventSummary,
   CreateStepPayload,
   EventStep,
+  PendingInvitation,
 } from "@/types/event";
 import { loadToken } from "./storage";
 
@@ -65,14 +66,14 @@ export async function apiFetch<T>(path: string, options: ApiOptions = {}): Promi
 }
 
 export const authApi = {
-  login: (credentials: { email: string; password: string }) =>
+  login: (credentials: { phone: string; password: string }) =>
     apiFetch<AuthResponse>("/api/auth/login", {
       method: "POST",
       body: JSON.stringify(credentials),
       auth: false,
     }),
   register: (payload: {
-    email: string;
+    email?: string;
     password: string;
     firstName: string;
     lastName: string;
@@ -110,6 +111,23 @@ export const eventApi = {
     apiFetch<EventStep>(`/api/events/${eventId}/steps`, {
       method: "POST",
       body: JSON.stringify(payload),
+    }),
+  invite: (eventId: string, payload: { phone: string }) =>
+    apiFetch<{ memberId: number; message: string }>(`/api/events/${eventId}/invitations`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+};
+
+export const invitationApi = {
+  pending: () => apiFetch<PendingInvitation[]>("/api/events/invitations/pending"),
+  accept: (memberId: number) =>
+    apiFetch<{ message: string; eventId: number }>(`/api/events/invitations/${memberId}/accept`, {
+      method: "POST",
+    }),
+  decline: (memberId: number) =>
+    apiFetch<{ message: string }>(`/api/events/invitations/${memberId}/decline`, {
+      method: "POST",
     }),
 };
 

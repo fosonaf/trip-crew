@@ -31,6 +31,7 @@ export type EventSummary = {
   price: number | null;
   role: string;
   paymentStatus: string | null;
+  status?: string;
 };
 
 export type EventMember = {
@@ -43,6 +44,8 @@ export type EventMember = {
   avatarUrl: string | null;
   role: string;
   paymentStatus: string | null;
+  status: "pending" | "active";
+  invitedBy: number | null;
 };
 
 export type EventStep = {
@@ -78,5 +81,13 @@ export type EventDetail = {
   };
   members: EventMember[];
   steps: EventStep[];
+};
+
+export type PendingInvitation = {
+  memberId: number;
+  eventId: number;
+  eventName: string;
+  startDate: string | null;
+  inviter: string | null;
 };
 

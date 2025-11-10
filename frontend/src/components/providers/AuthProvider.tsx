@@ -32,8 +32,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const normalizeUser = useCallback(
     (value: User): User => ({
       ...value,
+      email: value.email ?? null,
       avatarUrl: value.avatarUrl ?? null,
-      phone: value.phone ?? null,
+      phone: value.phone ?? "",
     }),
     [],
   );
