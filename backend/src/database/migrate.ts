@@ -65,6 +65,21 @@ const createTables = async (): Promise<void> => {
     console.log('Event members table created');
 
     await pool.query(`
+      CREATE TABLE IF NOT EXISTS event_join_requests (
+        id SERIAL PRIMARY KEY,
+        event_id INTEGER REFERENCES events(id) ON DELETE CASCADE,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        status VARCHAR(20) DEFAULT 'pending',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(event_id, user_id)
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS event_join_requests_event_idx ON event_join_requests(event_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS event_join_requests_status_idx ON event_join_requests(status)`);
+    console.log('Event join requests table created');
+
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS event_steps (
         id SERIAL PRIMARY KEY,
         event_id INTEGER REFERENCES events(id) ON DELETE CASCADE,

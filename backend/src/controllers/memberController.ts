@@ -226,6 +226,234 @@ export const inviteMember = async (req: Request, res: Response): Promise<void> =
   }
 };
 
+export const requestEventJoin = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { eventId } = req.params;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      res.status(401).json({ error: 'Not authenticated' });
+      return;
+    }
+
+    const eventResult = await pool.query('SELECT id FROM events WHERE id = $1', [eventId]);
+    if (eventResult.rows.length === 0) {
+      res.status(404).json({ error: 'Event not found' });
+      return;
+    }
+
+    const membershipResult = await pool.query(
+      'SELECT status FROM event_members WHERE event_id = $1 AND user_id = $2',
+      [eventId, userId]
+    );
+
+    if (membershipResult.rows.length > 0) {
+      const membership = membershipResult.rows[0];
+      if (membership.status === 'pending') {
+        res.status(400).json({ error: 'Une invitation est déjà en attente pour cet évènement.' });
+        return;
+      }
+
+      res.status(400).json({ error: 'Tu fais déjà partie de cet évènement.' });
+      return;
+    }
+
+    const existingRequestResult = await pool.query(
+      'SELECT id, status FROM event_join_requests WHERE event_id = $1 AND user_id = $2',
+      [eventId, userId]
+    );
+
+    if (existingRequestResult.rows.length > 0) {
+      const request = existingRequestResult.rows[0];
+
+      if (request.status === 'pending') {
+        res.status(200).json({ message: 'Ta demande est déjà en attente de validation.', requestId: Number(request.id) });
+        return;
+      }
+
+      await pool.query(
+        `UPDATE event_join_requests 
+         SET status = 'pending', updated_at = CURRENT_TIMESTAMP 
+         WHERE id = $1`,
+        [request.id]
+      );
+
+      res.status(200).json({ message: 'Ta demande a été renvoyée aux organisateurs.', requestId: Number(request.id) });
+      return;
+    }
+
+    const result = await pool.query(
+      `INSERT INTO event_join_requests (event_id, user_id, status)
+       VALUES ($1, $2, 'pending')
+       RETURNING id`,
+      [eventId, userId]
+    );
+
+    res.status(201).json({ message: 'Ta demande a été envoyée aux organisateurs.', requestId: Number(result.rows[0].id) });
+  } catch (error) {
+    console.error('Request join error:', error);
+    res.status(500).json({ error: 'Failed to submit join request' });
+  }
+};
+
+export const listEventJoinRequests = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { eventId } = req.params;
+
+    const result = await pool.query(
+      `SELECT jr.id, jr.created_at, u.id as user_id, u.first_name, u.last_name, u.email, u.phone, u.avatar_url
+       FROM event_join_requests jr
+       JOIN users u ON jr.user_id = u.id
+       WHERE jr.event_id = $1 AND jr.status = 'pending'
+       ORDER BY jr.created_at ASC`,
+      [eventId]
+    );
+
+    const requests = result.rows.map((row) => ({
+      id: Number(row.id),
+      userId: Number(row.user_id),
+      firstName: row.first_name as string,
+      lastName: row.last_name as string,
+      email: row.email as string | null,
+      phone: row.phone as string | null,
+      avatarUrl: row.avatar_url as string | null,
+      requestedAt: new Date(row.created_at).toISOString(),
+    }));
+
+    res.json(requests);
+  } catch (error) {
+    console.error('List join requests error:', error);
+    res.status(500).json({ error: 'Failed to list join requests' });
+  }
+};
+
+export const acceptJoinRequest = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { eventId, requestId } = req.params;
+
+    const requestResult = await pool.query(
+      'SELECT id, user_id, status FROM event_join_requests WHERE id = $1 AND event_id = $2',
+      [requestId, eventId]
+    );
+
+    if (requestResult.rows.length === 0) {
+      res.status(404).json({ error: 'Demande introuvable.' });
+      return;
+    }
+
+    const request = requestResult.rows[0];
+
+    if (request.status !== 'pending') {
+      res.status(400).json({ error: 'Cette demande a déjà été traitée.' });
+      return;
+    }
+
+    const requesterId = Number(request.user_id);
+
+    const existingMembership = await pool.query(
+      'SELECT id, status FROM event_members WHERE event_id = $1 AND user_id = $2',
+      [eventId, requesterId]
+    );
+
+    let memberId: number;
+
+    if (existingMembership.rows.length > 0) {
+      const membership = existingMembership.rows[0];
+      if (membership.status === 'active') {
+        await pool.query(
+          `UPDATE event_join_requests 
+           SET status = 'accepted', updated_at = CURRENT_TIMESTAMP 
+           WHERE id = $1`,
+          [requestId]
+        );
+        res.json({ message: 'Le membre participe déjà à cet évènement.' });
+        return;
+      }
+
+      await activatePendingMember(Number(membership.id), Number(eventId), requesterId);
+      memberId = Number(membership.id);
+    } else {
+      memberId = await createActiveMember(Number(eventId), requesterId);
+    }
+
+    await pool.query(
+      `UPDATE event_join_requests 
+       SET status = 'accepted', updated_at = CURRENT_TIMESTAMP 
+       WHERE id = $1`,
+      [requestId]
+    );
+
+    const memberResult = await pool.query(
+      `SELECT em.id, em.role, em.payment_status, em.status, em.invited_by,
+              u.id as user_id, u.first_name, u.last_name, u.email, u.phone, u.avatar_url
+       FROM event_members em
+       JOIN users u ON em.user_id = u.id
+       WHERE em.id = $1`,
+      [memberId]
+    );
+
+    if (memberResult.rows.length === 0) {
+      res.status(500).json({ error: 'Failed to retrieve member information' });
+      return;
+    }
+
+    const member = memberResult.rows[0];
+
+    res.json({
+      message: 'Demande acceptée.',
+      member: {
+        id: Number(member.id),
+        userId: Number(member.user_id),
+        firstName: member.first_name as string,
+        lastName: member.last_name as string,
+        email: member.email as string | null,
+        phone: member.phone as string | null,
+        role: member.role as string,
+        paymentStatus: member.payment_status,
+        status: member.status as string,
+        invitedBy: member.invited_by ? Number(member.invited_by) : null,
+        avatarUrl: member.avatar_url as string | null,
+      },
+    });
+  } catch (error) {
+    console.error('Accept join request error:', error);
+    res.status(500).json({ error: 'Failed to accept join request' });
+  }
+};
+
+export const declineJoinRequest = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { eventId, requestId } = req.params;
+
+    const requestResult = await pool.query(
+      'SELECT status FROM event_join_requests WHERE id = $1 AND event_id = $2',
+      [requestId, eventId]
+    );
+
+    if (requestResult.rows.length === 0) {
+      res.status(404).json({ error: 'Demande introuvable.' });
+      return;
+    }
+
+    if (requestResult.rows[0].status !== 'pending') {
+      res.status(400).json({ error: 'Cette demande a déjà été traitée.' });
+      return;
+    }
+
+    await pool.query(
+      `UPDATE event_join_requests 
+       SET status = 'declined', updated_at = CURRENT_TIMESTAMP 
+       WHERE id = $1`,
+      [requestId]
+    );
+
+    res.json({ message: 'Demande refusée.' });
+  } catch (error) {
+    console.error('Decline join request error:', error);
+    res.status(500).json({ error: 'Failed to decline join request' });
+  }
+};
+
 export const listPendingInvitations = async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = req.user?.id;

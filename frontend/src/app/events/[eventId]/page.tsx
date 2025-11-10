@@ -52,12 +52,20 @@ export default function EventDetailPage() {
   const [isStepModalOpen, setIsStepModalOpen] = useState(false);
   const [isMembersModalOpen, setIsMembersModalOpen] = useState(false);
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
+  const [isRequestsModalOpen, setIsRequestsModalOpen] = useState(false);
+  const [isLoadingRequests, setIsLoadingRequests] = useState(false);
+  const [requestsError, setRequestsError] = useState<string | null>(null);
+  const [processingRequest, setProcessingRequest] = useState<{ id: number; action: "accept" | "decline" } | null>(null);
   const [isSubmittingStep, setIsSubmittingStep] = useState(false);
   const [stepError, setStepError] = useState<string | null>(null);
   const [isSendingInvitation, setIsSendingInvitation] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [invitePhone, setInvitePhone] = useState("");
   const [isLeaving, setIsLeaving] = useState(false);
+  const [accessDenied, setAccessDenied] = useState(false);
+  const [joinRequestMessage, setJoinRequestMessage] = useState<string | null>(null);
+  const [joinRequestError, setJoinRequestError] = useState<string | null>(null);
+  const [isRequestingJoin, setIsRequestingJoin] = useState(false);
   const [stepForm, setStepForm] = useState({
     name: "",
     description: "",
@@ -82,10 +90,16 @@ export default function EventDetailPage() {
         const data = await eventApi.detail(eventId);
         setEvent(data);
         setError(null);
+        setAccessDenied(false);
       } catch (err) {
-        const message =
-          err instanceof Error ? err.message : "Impossible de charger le détail de l’évènement.";
-        setError(message);
+        if (err instanceof ApiError && err.status === 403) {
+          setAccessDenied(true);
+          setError(null);
+        } else {
+          const message =
+            err instanceof Error ? err.message : "Impossible de charger le détail de l’évènement.";
+          setError(message);
+        }
       } finally {
         if (withSpinner) {
           setIsLoading(false);
@@ -127,6 +141,46 @@ export default function EventDetailPage() {
   }, [event]);
 
   const isOrganizer = currentMember?.role === "organizer";
+
+  const pendingJoinRequests = useMemo(() => {
+    if (!event) return 0;
+    if (Array.isArray(event.joinRequests)) {
+      return event.joinRequests.length;
+    }
+    return event.joinRequestCount ?? 0;
+  }, [event]);
+
+  const fetchJoinRequests = useCallback(async () => {
+    if (!eventId || !isOrganizer) {
+      return;
+    }
+
+    setIsLoadingRequests(true);
+    setRequestsError(null);
+
+    try {
+      const requests = await eventApi.joinRequests(eventId);
+      setEvent((prev) =>
+        prev
+          ? {
+              ...prev,
+              joinRequests: requests,
+              joinRequestCount: requests.length,
+            }
+          : prev,
+      );
+    } catch (err) {
+      const message =
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : "Impossible de récupérer les demandes pour le moment.";
+      setRequestsError(message);
+    } finally {
+      setIsLoadingRequests(false);
+    }
+  }, [eventId, isOrganizer]);
 
   const canLeaveEvent = useMemo(() => {
     if (!currentMember) return false;
@@ -172,6 +226,18 @@ export default function EventDetailPage() {
     setInvitePhone("");
     setInviteError(null);
     setIsInviteModalOpen(true);
+  };
+
+  const openRequestsModal = () => {
+    setRequestsError(null);
+    setIsRequestsModalOpen(true);
+    void fetchJoinRequests();
+  };
+
+  const closeRequestsModal = () => {
+    setIsRequestsModalOpen(false);
+    setRequestsError(null);
+    setProcessingRequest(null);
   };
 
   const closeStepModal = useCallback(() => {
@@ -352,6 +418,98 @@ export default function EventDetailPage() {
       setToast({ message, variant: "error" });
     }
   };
+
+  const handleAcceptJoinRequest = async (requestId: number) => {
+    if (!event) {
+      return;
+    }
+
+    setProcessingRequest({ id: requestId, action: "accept" });
+    setRequestsError(null);
+
+    try {
+      const response = await eventApi.acceptJoinRequest(eventId, requestId);
+      const newMember = response.member ?? null;
+      setEvent((prev) => {
+        if (!prev) return prev;
+
+        const updatedRequests = prev.joinRequests.filter((request) => request.id !== requestId);
+
+        const updatedMembers = newMember
+          ? [...prev.members.filter((member) => member.id !== newMember.id), newMember].sort((a, b) =>
+              `${a.firstName ?? ""} ${a.lastName ?? ""}`.localeCompare(
+                `${b.firstName ?? ""} ${b.lastName ?? ""}`,
+                "fr",
+                { sensitivity: "base" },
+              ),
+            )
+          : prev.members;
+
+        return {
+          ...prev,
+          members: updatedMembers,
+          joinRequests: updatedRequests,
+          joinRequestCount: updatedRequests.length,
+        };
+      });
+      setToast({
+        message:
+          response.message ??
+          "Demande acceptée. Le membre est désormais ajouté à l’évènement.",
+        variant: "success",
+      });
+    } catch (err) {
+      const message =
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : "Impossible d’accepter cette demande pour le moment.";
+      setRequestsError(message);
+      setToast({ message, variant: "error" });
+    } finally {
+      setProcessingRequest(null);
+    }
+  };
+
+  const handleDeclineJoinRequest = async (requestId: number) => {
+    if (!event) {
+      return;
+    }
+
+    setProcessingRequest({ id: requestId, action: "decline" });
+    setRequestsError(null);
+
+    try {
+      const response = await eventApi.declineJoinRequest(eventId, requestId);
+      setEvent((prev) => {
+        if (!prev) {
+          return prev;
+        }
+        const updatedRequests = prev.joinRequests.filter((request) => request.id !== requestId);
+        return {
+          ...prev,
+          joinRequests: updatedRequests,
+          joinRequestCount: updatedRequests.length,
+        };
+      });
+      setToast({
+        message: response.message ?? "Demande refusée.",
+        variant: "success",
+      });
+    } catch (err) {
+      const message =
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : "Impossible de refuser cette demande pour le moment.";
+      setRequestsError(message);
+      setToast({ message, variant: "error" });
+    } finally {
+      setProcessingRequest(null);
+    }
+  };
   useEffect(() => {
     if (!toast) return;
     const timeout = setTimeout(() => setToast(null), 4000);
@@ -376,12 +534,78 @@ export default function EventDetailPage() {
     }
   };
 
+  const handleRequestsOverlayClick = (evt: MouseEvent<HTMLDivElement>) => {
+    if (evt.target === evt.currentTarget) {
+      closeRequestsModal();
+    }
+  };
+
+  const handleRequestJoin = async () => {
+    if (!eventId || isRequestingJoin) {
+      return;
+    }
+
+    setJoinRequestError(null);
+    setJoinRequestMessage(null);
+    setIsRequestingJoin(true);
+
+    try {
+      const response = await eventApi.requestJoin(eventId);
+      setJoinRequestMessage(response.message);
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("tripcrew:joinRequestSubmitted"));
+      }
+    } catch (err) {
+      const message =
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : "Impossible d’envoyer ta demande pour le moment.";
+      setJoinRequestError(message);
+    } finally {
+      setIsRequestingJoin(false);
+    }
+  };
+
   if (!isHydrated) {
     return null;
   }
 
   if (!token) {
     return null;
+  }
+
+  if (accessDenied) {
+    return (
+      <div className={styles.container}>
+        <div className={styles.layout}>
+          <section className={styles.card}>
+            <div className={styles.accessDeniedBlock}>
+              <h1 className={styles.accessDeniedTitle}>Accès restreint</h1>
+              <p className={styles.accessDeniedText}>
+                Tu ne fais pas partie de cet évènement. Tu peux demander aux organisateurs de t’ajouter en
+                utilisant le bouton ci-dessous.
+              </p>
+              {joinRequestMessage ? (
+                <div className={styles.requestSuccess}>{joinRequestMessage}</div>
+              ) : null}
+              {joinRequestError ? <div className={styles.stepFormError}>{joinRequestError}</div> : null}
+              <div className={styles.accessDeniedActions}>
+                <button
+                  type="button"
+                  className={styles.primaryAction}
+                  onClick={handleRequestJoin}
+                  disabled={isRequestingJoin}
+                >
+                  {isRequestingJoin ? "Demande en cours…" : "Demander à rejoindre l’évènement"}
+                </button>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -411,6 +635,21 @@ export default function EventDetailPage() {
               </button>
               {isOrganizer ? (
                 <>
+                  <button
+                    type="button"
+                    className={`${styles.ghostAction} ${styles.notificationAction}`}
+                    onClick={openRequestsModal}
+                    disabled={!event}
+                  >
+                    Demandes d’invitations
+                    <span
+                      className={`${styles.notificationBadge} ${
+                        pendingJoinRequests > 0 ? styles.notificationBadgeActive : ""
+                      }`}
+                    >
+                      {pendingJoinRequests}
+                    </span>
+                  </button>
                   <button
                     type="button"
                     className={styles.ghostAction}
@@ -677,6 +916,72 @@ export default function EventDetailPage() {
                   </div>
                 ))}
               </div>
+            )}
+          </div>
+        </div>
+      ) : null}
+
+      {isOrganizer && isRequestsModalOpen ? (
+        <div className={styles.modalOverlay} onClick={handleRequestsOverlayClick}>
+          <div className={styles.modalContent} role="dialog" aria-modal="true">
+            <header className={styles.modalHeader}>
+              <h2 className={styles.modalTitle}>Demandes d’invitations</h2>
+              <button type="button" className={styles.closeButton} onClick={closeRequestsModal}>
+                ×
+              </button>
+            </header>
+            {requestsError ? <div className={styles.stepFormError}>{requestsError}</div> : null}
+            {isLoadingRequests ? (
+              <div className={styles.loading}>Chargement des demandes…</div>
+            ) : event?.joinRequests.length ? (
+              <div className={styles.requestList}>
+                {event.joinRequests.map((request) => {
+                  const isProcessing = processingRequest?.id === request.id;
+                  const isAccepting = isProcessing && processingRequest?.action === "accept";
+                  const isDeclining = isProcessing && processingRequest?.action === "decline";
+                  return (
+                    <div key={request.id} className={styles.requestCard}>
+                      <div className={styles.requestInfo}>
+                        <h3 className={styles.requestName}>
+                          {request.firstName} {request.lastName}
+                        </h3>
+                        <p className={styles.requestContact}>
+                          Contact :{" "}
+                          {(() => {
+                            const details = [request.phone, request.email].filter(
+                              (value): value is string => Boolean(value),
+                            );
+                            return details.length > 0 ? details.join(" • ") : "Non renseigné";
+                          })()}
+                        </p>
+                        <p className={styles.requestDate}>
+                          Demande envoyée le {formatDateTime(request.requestedAt)}
+                        </p>
+                      </div>
+                      <div className={styles.requestActions}>
+                        <button
+                          type="button"
+                          className={styles.requestDecline}
+                          onClick={() => handleDeclineJoinRequest(request.id)}
+                          disabled={isProcessing}
+                        >
+                          {isDeclining ? "Refus…" : "Refuser"}
+                        </button>
+                        <button
+                          type="button"
+                          className={styles.requestAccept}
+                          onClick={() => handleAcceptJoinRequest(request.id)}
+                          disabled={isProcessing}
+                        >
+                          {isAccepting ? "Validation…" : "Accepter"}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className={styles.emptyState}>Aucune demande en attente pour le moment.</div>
             )}
           </div>
         </div>

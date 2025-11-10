@@ -85,3 +85,12 @@ export interface QRCodeData {
   userId: number;
   memberId: number;
 }
+
+export interface EventJoinRequest {
+  id: number;
+  event_id: number;
+  user_id: number;
+  status: 'pending' | 'accepted' | 'declined';
+  created_at: Date;
+  updated_at: Date;
+}

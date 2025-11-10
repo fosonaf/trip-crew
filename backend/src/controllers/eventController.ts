@@ -108,7 +108,7 @@ export const getEventById = async (req: Request, res: Response): Promise<void> =
     const userId = req.user?.id;
 
     const memberCheck = await pool.query(
-      "SELECT id FROM event_members WHERE event_id = $1 AND user_id = $2 AND status = 'active'",
+      "SELECT id, role FROM event_members WHERE event_id = $1 AND user_id = $2 AND status = 'active'",
       [eventId, userId]
     );
 
@@ -116,6 +116,8 @@ export const getEventById = async (req: Request, res: Response): Promise<void> =
       res.status(403).json({ error: 'Access denied' });
       return;
     }
+
+    const isOrganizer = memberCheck.rows[0].role === 'organizer';
 
     const eventResult = await pool.query(
       `SELECT e.*, u.first_name, u.last_name
@@ -145,6 +147,39 @@ export const getEventById = async (req: Request, res: Response): Promise<void> =
       `SELECT * FROM event_steps WHERE event_id = $1 ORDER BY scheduled_time`,
       [eventId]
     );
+
+    let joinRequests: Array<{
+      id: number;
+      userId: number;
+      firstName: string;
+      lastName: string;
+      email: string | null;
+      phone: string | null;
+      avatarUrl: string | null;
+      requestedAt: string;
+    }> = [];
+
+    if (isOrganizer) {
+      const joinRequestsResult = await pool.query(
+        `SELECT jr.id, jr.created_at, u.id as user_id, u.first_name, u.last_name, u.email, u.phone, u.avatar_url
+         FROM event_join_requests jr
+         JOIN users u ON jr.user_id = u.id
+         WHERE jr.event_id = $1 AND jr.status = 'pending'
+         ORDER BY jr.created_at ASC`,
+        [eventId]
+      );
+
+      joinRequests = joinRequestsResult.rows.map((row) => ({
+        id: Number(row.id),
+        userId: Number(row.user_id),
+        firstName: row.first_name as string,
+        lastName: row.last_name as string,
+        email: row.email as string | null,
+        phone: row.phone as string | null,
+        avatarUrl: row.avatar_url as string | null,
+        requestedAt: new Date(row.created_at).toISOString(),
+      }));
+    }
 
     res.json({
       id: event.id,
@@ -181,6 +216,8 @@ export const getEventById = async (req: Request, res: Response): Promise<void> =
         scheduledTime: s.scheduled_time,
         alertBeforeMinutes: s.alert_before_minutes,
       })),
+      joinRequests: joinRequests,
+      joinRequestCount: joinRequests.length,
     });
   } catch (error) {
     console.error('Get event error:', error);

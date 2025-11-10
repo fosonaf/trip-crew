@@ -7,6 +7,8 @@ import type {
   CreateStepPayload,
   EventStep,
   PendingInvitation,
+  EventJoinRequest,
+  EventMember,
 } from "@/types/event";
 import { loadToken } from "./storage";
 
@@ -128,6 +130,24 @@ export const eventApi = {
   removeInvitation: (eventId: string, memberId: number) =>
     apiFetch<{ message: string }>(`/api/events/${eventId}/invitations/${memberId}`, {
       method: "DELETE",
+    }),
+  requestJoin: (eventId: string) =>
+    apiFetch<{ message: string; requestId: number }>(`/api/events/${eventId}/requests`, {
+      method: "POST",
+      body: JSON.stringify({}),
+    }),
+  joinRequests: (eventId: string) =>
+    apiFetch<EventJoinRequest[]>(`/api/events/${eventId}/requests`),
+  acceptJoinRequest: (eventId: string, requestId: number) =>
+    apiFetch<{ message: string; member?: EventMember }>(
+      `/api/events/${eventId}/requests/${requestId}/accept`,
+      {
+        method: "POST",
+      },
+    ),
+  declineJoinRequest: (eventId: string, requestId: number) =>
+    apiFetch<{ message: string }>(`/api/events/${eventId}/requests/${requestId}/decline`, {
+      method: "POST",
     }),
 };
 

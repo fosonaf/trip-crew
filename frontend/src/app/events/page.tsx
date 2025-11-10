@@ -1,10 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, MouseEvent, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuthContext } from "@/components/providers/AuthProvider";
-import { eventApi } from "@/lib/api";
+import { ApiError, eventApi } from "@/lib/api";
 import type { EventSummary } from "@/types/event";
 import styles from "./page.module.css";
 
@@ -32,6 +32,11 @@ export default function EventsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [isJoinModalOpen, setIsJoinModalOpen] = useState(false);
+  const [joinEventId, setJoinEventId] = useState("");
+  const [joinError, setJoinError] = useState<string | null>(null);
+  const [joinMessage, setJoinMessage] = useState<string | null>(null);
+  const [isRequestingJoin, setIsRequestingJoin] = useState(false);
 
   const fetchEvents = useCallback(
     async (withSpinner = true) => {
@@ -113,6 +118,56 @@ export default function EventsPage() {
 
   const displayName = useMemo(() => formatName(user?.firstName), [user?.firstName]);
 
+  const openJoinModal = () => {
+    setJoinError(null);
+    setJoinMessage(null);
+    setJoinEventId("");
+    setIsJoinModalOpen(true);
+  };
+
+  const closeJoinModal = () => {
+    if (isRequestingJoin) return;
+    setIsJoinModalOpen(false);
+    setJoinError(null);
+    setJoinMessage(null);
+    setJoinEventId("");
+  };
+
+  const handleJoinSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!joinEventId.trim()) {
+      setJoinError("Merci d’indiquer l’identifiant de l’évènement.");
+      setJoinMessage(null);
+      return;
+    }
+
+    setIsRequestingJoin(true);
+    setJoinError(null);
+    setJoinMessage(null);
+
+    try {
+      const response = await eventApi.requestJoin(joinEventId.trim());
+      setJoinMessage(response.message);
+      setJoinEventId("");
+    } catch (err) {
+      const message =
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : "Impossible d’envoyer la demande pour le moment.";
+      setJoinError(message);
+    } finally {
+      setIsRequestingJoin(false);
+    }
+  };
+
+  const handleJoinOverlayClick = (evt: MouseEvent<HTMLDivElement>) => {
+    if (evt.target === evt.currentTarget) {
+      closeJoinModal();
+    }
+  };
+
   if (!isHydrated) {
     return null;
   }
@@ -142,6 +197,9 @@ export default function EventsPage() {
           <Link className={styles.buttonSecondary} href="#">
             Voir les notifications (bientôt)
           </Link>
+          <button type="button" className={styles.buttonTertiary} onClick={openJoinModal}>
+            Rejoindre un événement
+          </button>
         </div>
       </section>
 
@@ -236,6 +294,58 @@ export default function EventsPage() {
           </div>
         )}
       </section>
+      {isJoinModalOpen ? (
+        <div className={styles.joinModalOverlay} onClick={handleJoinOverlayClick}>
+          <div className={styles.joinModal} role="dialog" aria-modal="true">
+            <header className={styles.joinModalHeader}>
+              <h2 className={styles.joinModalTitle}>Rejoindre un évènement</h2>
+              <button
+                type="button"
+                className={styles.joinModalClose}
+                onClick={closeJoinModal}
+                aria-label="Fermer la fenêtre"
+                disabled={isRequestingJoin}
+              >
+                ×
+              </button>
+            </header>
+            <form className={styles.joinForm} onSubmit={handleJoinSubmit} noValidate>
+              <label htmlFor="join-event-id" className={styles.joinLabel}>
+                Identifiant de l’évènement
+              </label>
+              <input
+                id="join-event-id"
+                name="join-event-id"
+                type="text"
+                className={styles.joinInput}
+                placeholder="Ex. 123"
+                value={joinEventId}
+                onChange={(evt) => setJoinEventId(evt.target.value)}
+                disabled={isRequestingJoin}
+                autoFocus
+              />
+              <p className={styles.joinHelper}>
+                Demande envoyée uniquement si l’évènement existe et que tu n’en fais pas encore partie.
+              </p>
+              {joinError ? <div className={styles.joinError}>{joinError}</div> : null}
+              {joinMessage ? <div className={styles.joinSuccess}>{joinMessage}</div> : null}
+              <div className={styles.joinActions}>
+                <button
+                  type="button"
+                  className={styles.joinSecondary}
+                  onClick={closeJoinModal}
+                  disabled={isRequestingJoin}
+                >
+                  Annuler
+                </button>
+                <button type="submit" className={styles.joinPrimary} disabled={isRequestingJoin}>
+                  {isRequestingJoin ? "Envoi…" : "Envoyer la demande"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

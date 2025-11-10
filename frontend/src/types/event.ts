@@ -50,6 +50,17 @@ export type EventMember = {
   invitedBy: number | null;
 };
 
+export type EventJoinRequest = {
+  id: number;
+  userId: number;
+  firstName: string;
+  lastName: string;
+  email: string | null;
+  phone: string | null;
+  avatarUrl: string | null;
+  requestedAt: string;
+};
+
 export type EventStep = {
   id: number;
   name: string;
@@ -83,6 +94,8 @@ export type EventDetail = {
   };
   members: EventMember[];
   steps: EventStep[];
+  joinRequests: EventJoinRequest[];
+  joinRequestCount: number;
 };
 
 export type PendingInvitation = {
