@@ -3,27 +3,20 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 48px 16px;
-  background:
-    radial-gradient(circle at top, rgba(76, 95, 255, 0.18), transparent 55%),
-    linear-gradient(180deg, rgba(10, 10, 10, 0.06), rgba(10, 10, 10, 0));
+  padding: 56px 16px;
+  background-color: var(--bg-base);
 }
 
 .panel {
   width: min(440px, 100%);
-  background-color: rgba(255, 255, 255, 0.9);
-  border: 1px solid rgba(0, 0, 0, 0.06);
-  border-radius: 18px;
-  padding: 40px 36px;
-  box-shadow: 0 24px 60px rgba(23, 23, 23, 0.08);
-}
-
-@media (prefers-color-scheme: dark) {
-  .panel {
-    background-color: rgba(18, 18, 18, 0.92);
-    border-color: rgba(255, 255, 255, 0.08);
-    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
-  }
+  background-color: var(--bg-panel-strong);
+  border: 1px solid var(--border-base);
+  border-radius: 22px;
+  padding: 44px 38px;
+  box-shadow:
+    0 28px 60px rgba(6, 10, 22, 0.55),
+    0 12px 24px rgba(37, 99, 235, 0.18);
+  color: var(--text-primary);
 }
 
 @media (max-width: 520px) {
