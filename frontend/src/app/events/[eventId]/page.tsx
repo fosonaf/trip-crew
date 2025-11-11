@@ -13,7 +13,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useAuthContext } from "@/components/providers/AuthProvider";
 import { ApiError, eventApi } from "@/lib/api";
-import type { CreateStepPayload, EventDetail, EventStep } from "@/types/event";
+import type { CreateEventPayload, CreateStepPayload, EventDetail, EventStep } from "@/types/event";
 import styles from "./page.module.css";
 
 const formatDateTime = (value: string) => {
@@ -76,6 +76,12 @@ export default function EventDetailPage() {
   const [isLeaving, setIsLeaving] = useState(false);
   const [isUpdatingEvent, setIsUpdatingEvent] = useState(false);
   const [eventFormError, setEventFormError] = useState<string | null>(null);
+  const [isEventUpdateConfirmationOpen, setIsEventUpdateConfirmationOpen] = useState(false);
+  const [pendingEventUpdate, setPendingEventUpdate] = useState<{
+    payload: CreateEventPayload;
+    affectedBefore: number;
+    affectedAfter: number;
+  } | null>(null);
   const [accessDenied, setAccessDenied] = useState(false);
   const [joinRequestMessage, setJoinRequestMessage] = useState<string | null>(null);
   const [joinRequestError, setJoinRequestError] = useState<string | null>(null);
@@ -173,6 +179,36 @@ export default function EventDetailPage() {
     }
     return event.joinRequestCount ?? 0;
   }, [event]);
+
+  const eventUpdateConfirmationDetails = useMemo(() => {
+    if (!pendingEventUpdate) {
+      return null;
+    }
+
+    const { payload, affectedBefore, affectedAfter } = pendingEventUpdate;
+    const startLabel = formatDateTime(payload.startDate);
+    const endLabel = formatDateTime(payload.endDate);
+
+    const items: string[] = [];
+
+    if (affectedBefore > 0) {
+      items.push(
+        `${affectedBefore} étape${affectedBefore > 1 ? "s" : ""} seront déplacées à la nouvelle date de début.`,
+      );
+    }
+
+    if (affectedAfter > 0) {
+      items.push(
+        `${affectedAfter} étape${affectedAfter > 1 ? "s" : ""} seront déplacées à la nouvelle date de fin.`,
+      );
+    }
+
+    return {
+      startLabel,
+      endLabel,
+      items,
+    };
+  }, [pendingEventUpdate]);
 
   const fetchJoinRequests = useCallback(async () => {
     if (!eventId || !isOrganizer) {
@@ -276,6 +312,8 @@ export default function EventDetailPage() {
       price: event.isPaid && event.price != null ? String(event.price) : "",
     });
     setEventFormError(null);
+    setPendingEventUpdate(null);
+    setIsEventUpdateConfirmationOpen(false);
     setIsEditEventModalOpen(true);
   };
 
@@ -283,6 +321,8 @@ export default function EventDetailPage() {
     if (isUpdatingEvent) return;
     setIsEditEventModalOpen(false);
     setEventFormError(null);
+    setPendingEventUpdate(null);
+    setIsEventUpdateConfirmationOpen(false);
   };
 
   const openRequestsModal = () => {
@@ -661,6 +701,12 @@ export default function EventDetailPage() {
     }
   };
 
+  const handleEventUpdateConfirmationOverlayClick = (evt: MouseEvent<HTMLDivElement>) => {
+    if (evt.target === evt.currentTarget) {
+      handleCancelEventUpdateConfirmation();
+    }
+  };
+
   const handleEventFieldChange = (
     evt: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) => {
@@ -701,6 +747,34 @@ export default function EventDetailPage() {
     return null;
   };
 
+  const submitEventUpdate = useCallback(
+    async (payload: CreateEventPayload) => {
+      if (!eventId) return;
+
+      setIsUpdatingEvent(true);
+      setEventFormError(null);
+
+      try {
+        await eventApi.update(eventId, payload);
+        await fetchEvent(false);
+        setIsEditEventModalOpen(false);
+        setToast({ message: "Évènement mis à jour.", variant: "success" });
+      } catch (err) {
+        const message =
+          err instanceof ApiError
+            ? err.message
+            : err instanceof Error
+              ? err.message
+              : "Impossible de mettre à jour l’évènement pour le moment.";
+        setEventFormError(message);
+        setToast({ message, variant: "error" });
+      } finally {
+        setIsUpdatingEvent(false);
+      }
+    },
+    [eventId, fetchEvent],
+  );
+
   const handleEventSubmit = async (evt: FormEvent<HTMLFormElement>) => {
     evt.preventDefault();
     if (!eventId) return;
@@ -711,10 +785,7 @@ export default function EventDetailPage() {
       return;
     }
 
-    setIsUpdatingEvent(true);
-    setEventFormError(null);
-
-    const payload = {
+    const payload: CreateEventPayload = {
       name: eventForm.name.trim(),
       description: eventForm.description.trim(),
       location: eventForm.location.trim(),
@@ -724,23 +795,61 @@ export default function EventDetailPage() {
       price: eventForm.isPaid ? Number(eventForm.price) : null,
     };
 
-    try {
-      await eventApi.update(eventId, payload);
-      await fetchEvent(false);
-      setIsEditEventModalOpen(false);
-      setToast({ message: "Évènement mis à jour.", variant: "success" });
-    } catch (err) {
-      const message =
-        err instanceof ApiError
-          ? err.message
-          : err instanceof Error
-            ? err.message
-            : "Impossible de mettre à jour l’évènement pour le moment.";
-      setEventFormError(message);
-      setToast({ message, variant: "error" });
-    } finally {
-      setIsUpdatingEvent(false);
+    if (event) {
+      const nextStartDate = new Date(payload.startDate);
+      const nextEndDate = new Date(payload.endDate);
+      const currentStartDate = new Date(event.startDate);
+      const currentEndDate = new Date(event.endDate);
+
+      const hasStartChanged = currentStartDate.getTime() !== nextStartDate.getTime();
+      const hasEndChanged = currentEndDate.getTime() !== nextEndDate.getTime();
+
+      let affectedBefore = 0;
+      let affectedAfter = 0;
+
+      if (hasStartChanged) {
+        affectedBefore = event.steps.filter((step) => {
+          const scheduled = new Date(step.scheduledTime);
+          return !Number.isNaN(scheduled.valueOf()) && scheduled < nextStartDate;
+        }).length;
+      }
+
+      if (hasEndChanged) {
+        affectedAfter = event.steps.filter((step) => {
+          const scheduled = new Date(step.scheduledTime);
+          return !Number.isNaN(scheduled.valueOf()) && scheduled > nextEndDate;
+        }).length;
+      }
+
+      if ((hasStartChanged || hasEndChanged) && (affectedBefore > 0 || affectedAfter > 0)) {
+        setPendingEventUpdate({
+          payload,
+          affectedBefore,
+          affectedAfter,
+        });
+        setIsEventUpdateConfirmationOpen(true);
+        return;
+      }
     }
+
+    await submitEventUpdate(payload);
+  };
+
+  const handleCancelEventUpdateConfirmation = () => {
+    setPendingEventUpdate(null);
+    setIsEventUpdateConfirmationOpen(false);
+  };
+
+  const handleConfirmEventUpdate = async () => {
+    if (!pendingEventUpdate) {
+      setIsEventUpdateConfirmationOpen(false);
+      return;
+    }
+
+    const { payload } = pendingEventUpdate;
+    setPendingEventUpdate(null);
+    setIsEventUpdateConfirmationOpen(false);
+    await submitEventUpdate(payload);
   };
 
   const handleTransferAdmin = async (memberId: number) => {
@@ -1246,6 +1355,60 @@ export default function EventDetailPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      ) : null}
+
+      {isEventUpdateConfirmationOpen && pendingEventUpdate && eventUpdateConfirmationDetails ? (
+        <div
+          className={styles.modalOverlay}
+          onClick={handleEventUpdateConfirmationOverlayClick}
+        >
+          <div className={styles.modalContent} role="dialog" aria-modal="true">
+            <header className={styles.modalHeader}>
+              <h2 className={styles.modalTitle}>Confirmer la modification</h2>
+              <button
+                type="button"
+                className={styles.closeButton}
+                onClick={handleCancelEventUpdateConfirmation}
+                disabled={isUpdatingEvent}
+              >
+                ×
+              </button>
+            </header>
+            <div className={styles.stepForm}>
+              <p>
+                Le nouveau créneau ({eventUpdateConfirmationDetails.startLabel} →{" "}
+                {eventUpdateConfirmationDetails.endLabel}) entraînera l’ajustement automatique de
+                certaines étapes.
+              </p>
+              {eventUpdateConfirmationDetails.items.length > 0 ? (
+                <ul>
+                  {eventUpdateConfirmationDetails.items.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              ) : null}
+              <p>Confirmer la mise à jour de l’évènement&nbsp;?</p>
+              <div className={styles.stepFormActions}>
+                <button
+                  type="button"
+                  className={styles.secondaryAction}
+                  onClick={handleCancelEventUpdateConfirmation}
+                  disabled={isUpdatingEvent}
+                >
+                  Annuler
+                </button>
+                <button
+                  type="button"
+                  className={styles.primaryAction}
+                  onClick={handleConfirmEventUpdate}
+                  disabled={isUpdatingEvent}
+                >
+                  Confirmer
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       ) : null}
