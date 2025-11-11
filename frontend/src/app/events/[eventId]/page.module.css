@@ -280,6 +280,22 @@
   color: var(--text-secondary);
 }
 
+.memberTransferButton {
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(59, 130, 246, 0.45);
+  background-color: rgba(59, 130, 246, 0.2);
+  color: rgba(59, 130, 246, 1);
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 150ms ease, box-shadow 150ms ease;
+}
+
+.memberTransferButton:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 24px rgba(59, 130, 246, 0.25);
+}
+
 .memberRemoveButton {
   padding: 6px 12px;
   border-radius: 999px;
@@ -539,6 +555,14 @@
   font-weight: 500;
 }
 
+.checkboxRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+}
+
 .helper {
   font-size: 0.85rem;
   color: var(--text-secondary);
@@ -550,6 +574,13 @@
   border: 1px solid rgba(148, 163, 184, 0.28);
   background-color: rgba(15, 23, 42, 0.35);
   display: grid;
+  gap: 12px;
+}
+
+.stepHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 12px;
 }
 
@@ -569,6 +600,37 @@
   display: grid;
   gap: 8px;
   font-size: 0.95rem;
+}
+
+.stepActions {
+  display: inline-flex;
+  gap: 8px;
+}
+
+.stepActionButton {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid rgba(59, 130, 246, 0.45);
+  background-color: rgba(59, 130, 246, 0.18);
+  color: rgba(59, 130, 246, 1);
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 150ms ease, box-shadow 150ms ease, opacity 120ms ease;
+}
+
+.stepActionButton:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 24px rgba(59, 130, 246, 0.25);
+}
+
+.stepActionDelete {
+  border-color: rgba(248, 113, 113, 0.45);
+  background-color: rgba(248, 113, 113, 0.2);
+  color: rgba(248, 113, 113, 1);
 }
 
 .emptyState {

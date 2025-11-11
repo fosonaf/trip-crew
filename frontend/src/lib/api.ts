@@ -110,8 +110,27 @@ export const eventApi = {
     }),
   list: () => apiFetch<EventSummary[]>("/api/events"),
   detail: (eventId: string) => apiFetch<EventDetail>(`/api/events/${eventId}`),
+  update: (eventId: string, payload: CreateEventPayload) =>
+    apiFetch<{ message: string }>(`/api/events/${eventId}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    }),
   createStep: (eventId: string, payload: CreateStepPayload) =>
     apiFetch<EventStep>(`/api/events/${eventId}/steps`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  updateStep: (eventId: string, stepId: number, payload: CreateStepPayload) =>
+    apiFetch<{ message: string }>(`/api/events/${eventId}/steps/${stepId}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    }),
+  deleteStep: (eventId: string, stepId: number) =>
+    apiFetch<{ message: string }>(`/api/events/${eventId}/steps/${stepId}`, {
+      method: "DELETE",
+    }),
+  transferAdmin: (eventId: string, payload: { memberId: number }) =>
+    apiFetch<{ message: string }>(`/api/events/${eventId}/admin/transfer`, {
       method: "POST",
       body: JSON.stringify(payload),
     }),

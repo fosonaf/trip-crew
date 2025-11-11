@@ -62,6 +62,21 @@ export const isEventOrganizer = async (
       return;
     }
 
+    const event = await prisma.event.findUnique({
+      where: { id: Number(eventId) },
+      select: { createdBy: true },
+    });
+
+    if (!event) {
+      res.status(404).json({ error: 'Event not found' });
+      return;
+    }
+
+    if (event.createdBy === userId) {
+      next();
+      return;
+    }
+
     const organizerMembership = await prisma.eventMember.findFirst({
       where: {
         eventId: Number(eventId),

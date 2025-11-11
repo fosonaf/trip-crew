@@ -340,24 +340,68 @@ export const updateEvent = async (req: Request, res: Response): Promise<void> =>
         ? null
         : Number(price);
 
-    const updated = await prisma.event.update({
+    const event = await prisma.event.findUnique({
       where: { id: Number(eventId) },
-      data: {
-        name,
-        description: description ?? null,
-        startDate: parseDate(startDate),
-        endDate: parseDate(endDate),
-        location: location ?? null,
-        isPaid: toBoolean(isPaid),
-        price: normalizedPrice,
+      include: {
+        steps: true,
       },
-      select: { id: true },
-    }).catch(() => null);
+    });
 
-    if (!updated) {
+    if (!event) {
       res.status(404).json({ error: 'Event not found' });
       return;
     }
+
+    const previousStart = event.startDate ?? null;
+    const previousEnd = event.endDate ?? null;
+
+    const nextStart = parseDate(startDate) ?? previousStart;
+    const nextEnd = parseDate(endDate) ?? previousEnd;
+
+    await prisma.$transaction(async (tx) => {
+      await tx.event.update({
+        where: { id: event.id },
+        data: {
+          name,
+          description: description ?? null,
+          startDate: nextStart,
+          endDate: nextEnd,
+          location: location ?? null,
+          isPaid: toBoolean(isPaid),
+          price: normalizedPrice,
+        },
+      });
+
+      if (previousStart && nextStart && previousStart.getTime() !== nextStart.getTime()) {
+        const affectedSteps = event.steps.filter(
+          (step) => step.scheduledTime && step.scheduledTime < nextStart,
+        );
+
+        for (const step of affectedSteps) {
+          await tx.eventStep.update({
+            where: { id: step.id },
+            data: {
+              scheduledTime: nextStart,
+            },
+          });
+        }
+      }
+
+      if (previousEnd && nextEnd && previousEnd.getTime() !== nextEnd.getTime()) {
+        const affectedSteps = event.steps.filter(
+          (step) => step.scheduledTime && step.scheduledTime > nextEnd,
+        );
+
+        for (const step of affectedSteps) {
+          await tx.eventStep.update({
+            where: { id: step.id },
+            data: {
+              scheduledTime: nextEnd,
+            },
+          });
+        }
+      }
+    });
 
     res.json({ message: 'Event updated successfully' });
   } catch (error) {

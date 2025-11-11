@@ -13,7 +13,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useAuthContext } from "@/components/providers/AuthProvider";
 import { ApiError, eventApi } from "@/lib/api";
-import type { CreateStepPayload, EventDetail } from "@/types/event";
+import type { CreateStepPayload, EventDetail, EventStep } from "@/types/event";
 import styles from "./page.module.css";
 
 const formatDateTime = (value: string) => {
@@ -40,6 +40,16 @@ const formatPrice = (isPaid: boolean, price: number | null) => {
   })} €`;
 };
 
+const toDateTimeLocalValue = (value: string | null | undefined) => {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.valueOf())) {
+    return "";
+  }
+  const pad = (num: number) => num.toString().padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+};
+
 export default function EventDetailPage() {
   const { token, user, isHydrated } = useAuthContext();
   const router = useRouter();
@@ -52,16 +62,20 @@ export default function EventDetailPage() {
   const [isStepModalOpen, setIsStepModalOpen] = useState(false);
   const [isMembersModalOpen, setIsMembersModalOpen] = useState(false);
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
+  const [isEditEventModalOpen, setIsEditEventModalOpen] = useState(false);
   const [isRequestsModalOpen, setIsRequestsModalOpen] = useState(false);
   const [isLoadingRequests, setIsLoadingRequests] = useState(false);
   const [requestsError, setRequestsError] = useState<string | null>(null);
   const [processingRequest, setProcessingRequest] = useState<{ id: number; action: "accept" | "decline" } | null>(null);
+  const [editingStep, setEditingStep] = useState<EventStep | null>(null);
   const [isSubmittingStep, setIsSubmittingStep] = useState(false);
   const [stepError, setStepError] = useState<string | null>(null);
   const [isSendingInvitation, setIsSendingInvitation] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [invitePhone, setInvitePhone] = useState("");
   const [isLeaving, setIsLeaving] = useState(false);
+  const [isUpdatingEvent, setIsUpdatingEvent] = useState(false);
+  const [eventFormError, setEventFormError] = useState<string | null>(null);
   const [accessDenied, setAccessDenied] = useState(false);
   const [joinRequestMessage, setJoinRequestMessage] = useState<string | null>(null);
   const [joinRequestError, setJoinRequestError] = useState<string | null>(null);
@@ -72,6 +86,15 @@ export default function EventDetailPage() {
     location: "",
     scheduledTime: "",
     alertBeforeMinutes: "30",
+  });
+  const [eventForm, setEventForm] = useState({
+    name: "",
+    description: "",
+    location: "",
+    startDate: "",
+    endDate: "",
+    isPaid: false,
+    price: "",
   });
   const [toast, setToast] = useState<{ message: string; variant: "success" | "error" } | null>(null);
 
@@ -188,18 +211,24 @@ export default function EventDetailPage() {
     if (currentMember.status !== "active") {
       return false;
     }
+    if (isAdmin) {
+      return false;
+    }
     if (currentMember.role === "organizer" && activeOrganizerCount <= 1) {
       return false;
     }
     return true;
-  }, [currentMember, activeOrganizerCount]);
+  }, [currentMember, activeOrganizerCount, isAdmin]);
 
   const leaveButtonLabel = useMemo(() => {
+    if (isAdmin) {
+      return "Administrateur";
+    }
     if (currentMember?.role === "organizer" && activeOrganizerCount <= 1) {
       return "Dernier organisateur";
     }
     return isLeaving ? "Départ..." : "Quitter l’évènement";
-  }, [currentMember, activeOrganizerCount, isLeaving]);
+  }, [currentMember, activeOrganizerCount, isLeaving, isAdmin]);
 
   const handleStepFieldChange = (
     evt: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>,
@@ -217,6 +246,7 @@ export default function EventDetailPage() {
       alertBeforeMinutes: "30",
     });
     setStepError(null);
+    setEditingStep(null);
   };
 
   const handleInviteInputChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -227,6 +257,32 @@ export default function EventDetailPage() {
     setInvitePhone("");
     setInviteError(null);
     setIsInviteModalOpen(true);
+  };
+
+  const openCreateStepModal = () => {
+    resetStepForm();
+    setIsStepModalOpen(true);
+  };
+
+  const openEditEventModal = () => {
+    if (!event) return;
+    setEventForm({
+      name: event.name,
+      description: event.description ?? "",
+      location: event.location ?? "",
+      startDate: toDateTimeLocalValue(event.startDate),
+      endDate: toDateTimeLocalValue(event.endDate),
+      isPaid: event.isPaid,
+      price: event.isPaid && event.price != null ? String(event.price) : "",
+    });
+    setEventFormError(null);
+    setIsEditEventModalOpen(true);
+  };
+
+  const closeEditEventModal = () => {
+    if (isUpdatingEvent) return;
+    setIsEditEventModalOpen(false);
+    setEventFormError(null);
   };
 
   const openRequestsModal = () => {
@@ -281,20 +337,27 @@ export default function EventDetailPage() {
     setStepError(null);
 
     try {
-      const newStep = await eventApi.createStep(eventId, payload);
-      setEvent((prev) =>
-        prev
-          ? {
-              ...prev,
-              steps: [...prev.steps, newStep].sort(
-                (a, b) => new Date(a.scheduledTime).getTime() - new Date(b.scheduledTime).getTime(),
-              ),
-            }
-          : prev,
-      );
+      if (editingStep) {
+        await eventApi.updateStep(eventId, editingStep.id, payload);
+        await fetchEvent(false);
+        setToast({ message: "Étape mise à jour.", variant: "success" });
+      } else {
+        const newStep = await eventApi.createStep(eventId, payload);
+        setEvent((prev) =>
+          prev
+            ? {
+                ...prev,
+                steps: [...prev.steps, newStep].sort(
+                  (a, b) =>
+                    new Date(a.scheduledTime).getTime() - new Date(b.scheduledTime).getTime(),
+                ),
+              }
+            : prev,
+        );
+        setToast({ message: "Étape ajoutée avec succès.", variant: "success" });
+      }
       resetStepForm();
-      closeStepModal();
-      setToast({ message: "Étape ajoutée avec succès.", variant: "success" });
+      setIsStepModalOpen(false);
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Impossible d’ajouter l’étape pour le moment.";
@@ -306,6 +369,7 @@ export default function EventDetailPage() {
       });
     } finally {
       setIsSubmittingStep(false);
+      setEditingStep(null);
     }
   };
 
@@ -416,6 +480,39 @@ export default function EventDetailPage() {
           : err instanceof Error
             ? err.message
             : "Impossible de supprimer cette invitation pour le moment.";
+      setToast({ message, variant: "error" });
+    }
+  };
+
+  const handleEditStep = (step: EventStep) => {
+    setEditingStep(step);
+    setStepForm({
+      name: step.name,
+      description: step.description ?? "",
+      location: step.location ?? "",
+      scheduledTime: toDateTimeLocalValue(step.scheduledTime),
+      alertBeforeMinutes:
+        step.alertBeforeMinutes !== null && step.alertBeforeMinutes !== undefined
+          ? String(step.alertBeforeMinutes)
+          : "",
+    });
+    setStepError(null);
+    setIsStepModalOpen(true);
+  };
+
+  const handleDeleteStep = async (stepId: number) => {
+    if (!eventId) return;
+    try {
+      await eventApi.deleteStep(eventId, stepId);
+      await fetchEvent(false);
+      setToast({ message: "Étape supprimée.", variant: "success" });
+    } catch (err) {
+      const message =
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : "Impossible de supprimer cette étape pour le moment.";
       setToast({ message, variant: "error" });
     }
   };
@@ -541,6 +638,111 @@ export default function EventDetailPage() {
     }
   };
 
+  const handleEventOverlayClick = (evt: MouseEvent<HTMLDivElement>) => {
+    if (evt.target === evt.currentTarget) {
+      closeEditEventModal();
+    }
+  };
+
+  const handleEventFieldChange = (
+    evt: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+  ) => {
+    const { name, value } = evt.target;
+    setEventForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleEventCheckboxChange = (evt: ChangeEvent<HTMLInputElement>) => {
+    const { checked } = evt.target;
+    setEventForm((prev) => ({
+      ...prev,
+      isPaid: checked,
+      price: checked ? prev.price : "",
+    }));
+  };
+
+  const validateEventForm = () => {
+    if (!eventForm.name.trim()) {
+      return "Le nom de l’évènement est obligatoire.";
+    }
+    if (!eventForm.startDate || !eventForm.endDate) {
+      return "Merci d’indiquer les dates de début et de fin.";
+    }
+    const start = new Date(eventForm.startDate);
+    const end = new Date(eventForm.endDate);
+    if (Number.isNaN(start.valueOf()) || Number.isNaN(end.valueOf())) {
+      return "Merci d’indiquer des dates valides.";
+    }
+    if (end < start) {
+      return "La date de fin doit être postérieure à la date de début.";
+    }
+    if (eventForm.isPaid) {
+      const priceValue = Number(eventForm.price);
+      if (!eventForm.price || Number.isNaN(priceValue) || priceValue < 0) {
+        return "Merci d’indiquer un prix valide.";
+      }
+    }
+    return null;
+  };
+
+  const handleEventSubmit = async (evt: FormEvent<HTMLFormElement>) => {
+    evt.preventDefault();
+    if (!eventId) return;
+
+    const validationError = validateEventForm();
+    if (validationError) {
+      setEventFormError(validationError);
+      return;
+    }
+
+    setIsUpdatingEvent(true);
+    setEventFormError(null);
+
+    const payload = {
+      name: eventForm.name.trim(),
+      description: eventForm.description.trim() || null,
+      location: eventForm.location.trim() || null,
+      startDate: new Date(eventForm.startDate).toISOString(),
+      endDate: new Date(eventForm.endDate).toISOString(),
+      isPaid: eventForm.isPaid,
+      price: eventForm.isPaid ? Number(eventForm.price) : null,
+    };
+
+    try {
+      await eventApi.update(eventId, payload);
+      await fetchEvent(false);
+      setIsEditEventModalOpen(false);
+      setToast({ message: "Évènement mis à jour.", variant: "success" });
+    } catch (err) {
+      const message =
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : "Impossible de mettre à jour l’évènement pour le moment.";
+      setEventFormError(message);
+      setToast({ message, variant: "error" });
+    } finally {
+      setIsUpdatingEvent(false);
+    }
+  };
+
+  const handleTransferAdmin = async (memberId: number) => {
+    if (!eventId) return;
+    try {
+      await eventApi.transferAdmin(eventId, { memberId });
+      await fetchEvent(false);
+      setToast({ message: "Nouvel administrateur désigné.", variant: "success" });
+    } catch (err) {
+      const message =
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : "Impossible de transférer l’administration pour le moment.";
+      setToast({ message, variant: "error" });
+    }
+  };
+
   const handleRequestJoin = async () => {
     if (!eventId || isRequestingJoin) {
       return;
@@ -620,17 +822,22 @@ export default function EventDetailPage() {
             <div className={styles.topActions}>
               <button
                 type="button"
-                className={`${styles.ghostAction} ${styles.notificationAction}`}
+                className={styles.ghostAction}
                 onClick={() => setIsMembersModalOpen(true)}
                 disabled={!event}
               >
                 Voir les membres
-                <span
-                  className={`${styles.notificationBadge}`}
-                >
-                  {event?.members.length}
-                </span>
               </button>
+              {isOrganizer ? (
+                <button
+                  type="button"
+                  className={styles.ghostAction}
+                  onClick={openEditEventModal}
+                  disabled={!event}
+                >
+                  Modifier l’évènement
+                </button>
+              ) : null}
               <button
                 type="button"
                 className={styles.leaveAction}
@@ -667,7 +874,7 @@ export default function EventDetailPage() {
                   <button
                     type="button"
                     className={styles.primaryAction}
-                    onClick={() => setIsStepModalOpen(true)}
+                    onClick={openCreateStepModal}
                   >
                     Ajouter une étape
                   </button>
@@ -728,7 +935,29 @@ export default function EventDetailPage() {
                 <div className={styles.stepsList}>
                   {event.steps.map((step) => (
                     <div key={step.id} className={styles.stepCard}>
-                      <h3 className={styles.stepTitle}>{step.name}</h3>
+                      <div className={styles.stepHeader}>
+                        <h3 className={styles.stepTitle}>{step.name}</h3>
+                        {isOrganizer ? (
+                          <div className={styles.stepActions}>
+                            <button
+                              type="button"
+                              className={styles.stepActionButton}
+                              aria-label="Modifier l’étape"
+                              onClick={() => handleEditStep(step)}
+                            >
+                              ✎
+                            </button>
+                            <button
+                              type="button"
+                              className={`${styles.stepActionButton} ${styles.stepActionDelete}`}
+                              aria-label="Supprimer l’étape"
+                              onClick={() => handleDeleteStep(step.id)}
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ) : null}
+                      </div>
                       {step.description ? (
                         <p className={styles.stepDescription}>{step.description}</p>
                       ) : null}
@@ -754,7 +983,9 @@ export default function EventDetailPage() {
         <div className={styles.modalOverlay} onClick={handleStepOverlayClick}>
           <div className={styles.modalContent} role="dialog" aria-modal="true">
             <header className={styles.modalHeader}>
-              <h2 className={styles.modalTitle}>Ajouter une étape</h2>
+              <h2 className={styles.modalTitle}>
+                {editingStep ? "Modifier l’étape" : "Ajouter une étape"}
+              </h2>
               <button type="button" className={styles.closeButton} onClick={handleCancelStep}>
                 ×
               </button>
@@ -849,7 +1080,152 @@ export default function EventDetailPage() {
                   Annuler
                 </button>
                 <button type="submit" className={styles.primaryAction} disabled={isSubmittingStep}>
-                  {isSubmittingStep ? "Ajout en cours…" : "Ajouter l’étape"}
+                  {isSubmittingStep
+                    ? editingStep
+                      ? "Modification…"
+                      : "Ajout en cours…"
+                    : editingStep
+                      ? "Mettre à jour l’étape"
+                      : "Ajouter l’étape"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
+
+      {isOrganizer && isEditEventModalOpen ? (
+        <div className={styles.modalOverlay} onClick={handleEventOverlayClick}>
+          <div className={styles.modalContent} role="dialog" aria-modal="true">
+            <header className={styles.modalHeader}>
+              <h2 className={styles.modalTitle}>Modifier l’évènement</h2>
+              <button type="button" className={styles.closeButton} onClick={closeEditEventModal}>
+                ×
+              </button>
+            </header>
+            <form className={styles.stepForm} onSubmit={handleEventSubmit} noValidate>
+              {eventFormError ? <div className={styles.stepFormError}>{eventFormError}</div> : null}
+              <div className={styles.stepFormRow}>
+                <div className={styles.field}>
+                  <label htmlFor="event-name" className={styles.label}>
+                    Nom
+                  </label>
+                  <input
+                    id="event-name"
+                    name="name"
+                    type="text"
+                    className={styles.input}
+                    value={eventForm.name}
+                    onChange={handleEventFieldChange}
+                    required
+                  />
+                </div>
+              </div>
+              <div className={styles.stepFormRow}>
+                <div className={styles.field}>
+                  <label htmlFor="event-description" className={styles.label}>
+                    Description
+                  </label>
+                  <textarea
+                    id="event-description"
+                    name="description"
+                    className={styles.textarea}
+                    value={eventForm.description}
+                    onChange={handleEventFieldChange}
+                  />
+                </div>
+              </div>
+              <div className={`${styles.stepFormRow} ${styles.stepFormRowTwoCols}`}>
+                <div className={styles.field}>
+                  <label htmlFor="event-startDate" className={styles.label}>
+                    Date de début
+                  </label>
+                  <input
+                    id="event-startDate"
+                    name="startDate"
+                    type="datetime-local"
+                    className={styles.input}
+                    value={eventForm.startDate}
+                    onChange={handleEventFieldChange}
+                    required
+                  />
+                </div>
+                <div className={styles.field}>
+                  <label htmlFor="event-endDate" className={styles.label}>
+                    Date de fin
+                  </label>
+                  <input
+                    id="event-endDate"
+                    name="endDate"
+                    type="datetime-local"
+                    className={styles.input}
+                    value={eventForm.endDate}
+                    onChange={handleEventFieldChange}
+                    required
+                  />
+                </div>
+              </div>
+              <div className={styles.stepFormRow}>
+                <div className={styles.field}>
+                  <label htmlFor="event-location" className={styles.label}>
+                    Lieu
+                  </label>
+                  <input
+                    id="event-location"
+                    name="location"
+                    type="text"
+                    className={styles.input}
+                    value={eventForm.location}
+                    onChange={handleEventFieldChange}
+                  />
+                </div>
+              </div>
+              <div className={styles.stepFormRow}>
+                <div className={styles.field}>
+                  <label htmlFor="event-isPaid" className={styles.label}>
+                    Évènement payant ?
+                  </label>
+                  <label className={styles.checkboxRow}>
+                    <input
+                      id="event-isPaid"
+                      name="isPaid"
+                      type="checkbox"
+                      checked={eventForm.isPaid}
+                      onChange={handleEventCheckboxChange}
+                    />
+                    <span>Paiement requis</span>
+                  </label>
+                </div>
+              </div>
+              {eventForm.isPaid ? (
+                <div className={styles.stepFormRow}>
+                  <div className={styles.field}>
+                    <label htmlFor="event-price" className={styles.label}>
+                      Prix (en €)
+                    </label>
+                    <input
+                      id="event-price"
+                      name="price"
+                      type="number"
+                      min="0"
+                      className={styles.input}
+                      value={eventForm.price}
+                      onChange={handleEventFieldChange}
+                    />
+                  </div>
+                </div>
+              ) : null}
+              <div className={styles.stepFormActions}>
+                <button
+                  type="button"
+                  className={styles.secondaryAction}
+                  onClick={closeEditEventModal}
+                  disabled={isUpdatingEvent}
+                >
+                  Annuler
+                </button>
+                <button type="submit" className={styles.primaryAction} disabled={isUpdatingEvent}>
+                  {isUpdatingEvent ? "Sauvegarde…" : "Mettre à jour"}
                 </button>
               </div>
             </form>
@@ -898,6 +1274,18 @@ export default function EventDetailPage() {
                         ) : null}
                         {member.role === "organizer" ? (
                           <span className={styles.roleTag}>Organisateur</span>
+                        ) : null}
+                        {isAdmin &&
+                        member.status === "active" &&
+                        member.role === "organizer" &&
+                        member.userId !== user?.id ? (
+                          <button
+                            type="button"
+                            className={styles.memberTransferButton}
+                            onClick={() => handleTransferAdmin(member.id)}
+                          >
+                            Nommer admin
+                          </button>
                         ) : null}
                         {isOrganizer && member.status === "pending" ? (
                           <button
