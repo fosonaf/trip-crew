@@ -813,7 +813,7 @@ export default function EventDetailScreen() {
             onPress={() => acceptJoinRequestMutation.mutate(request.id)}
             disabled={acceptJoinRequestMutation.isPending || declineJoinRequestMutation.isPending}
           >
-            <Text style={styles.requestButtonLabel}>
+            <Text style={[styles.requestButtonLabel, styles.requestButtonLabelAccent]}>
               {acceptJoinRequestMutation.isPending ? "Accept..." : "Accepter"}
             </Text>
           </Pressable>
@@ -1084,7 +1084,7 @@ export default function EventDetailScreen() {
                 value={invitePhone}
                 onChangeText={setInvitePhone}
                 placeholder="+33600000000"
-                placeholderTextColor="rgba(12,27,51,0.4)"
+                placeholderTextColor="rgba(255,255,255,0.4)"
                 keyboardType="phone-pad"
                 style={styles.input}
               />
@@ -1173,7 +1173,7 @@ export default function EventDetailScreen() {
                   value={stepForm.name}
                   onChangeText={(value) => setStepForm((prev) => ({ ...prev, name: value }))}
                   placeholder="Nom de l’étape"
-                  placeholderTextColor="rgba(12,27,51,0.4)"
+                  placeholderTextColor="rgba(255,255,255,0.4)"
                   style={styles.input}
                 />
               </View>
@@ -1185,7 +1185,7 @@ export default function EventDetailScreen() {
                     setStepForm((prev) => ({ ...prev, description: value }))
                   }
                   placeholder="Détails supplémentaires"
-                  placeholderTextColor="rgba(12,27,51,0.4)"
+                  placeholderTextColor="rgba(255,255,255,0.4)"
                   style={[styles.input, styles.inputMultiline]}
                   multiline
                 />
@@ -1196,7 +1196,7 @@ export default function EventDetailScreen() {
                   value={stepForm.location}
                   onChangeText={(value) => setStepForm((prev) => ({ ...prev, location: value }))}
                   placeholder="Lieu de l’étape"
-                  placeholderTextColor="rgba(12,27,51,0.4)"
+                  placeholderTextColor="rgba(255,255,255,0.4)"
                   style={styles.input}
                 />
               </View>
@@ -1208,7 +1208,7 @@ export default function EventDetailScreen() {
                     setStepForm((prev) => ({ ...prev, scheduledTime: value }))
                   }
                   placeholder="2025-01-12T13:30"
-                  placeholderTextColor="rgba(12,27,51,0.4)"
+                  placeholderTextColor="rgba(255,255,255,0.4)"
                   style={styles.input}
                 />
               </View>
@@ -1628,11 +1628,13 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   modalContent: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "rgba(12, 27, 51, 0.95)",
     borderRadius: 24,
     padding: 20,
     maxHeight: "90%",
     gap: 16,
+    borderWidth: 1,
+    borderColor: "rgba(80, 227, 194, 0.18)",
   },
   modalHeader: {
     flexDirection: "row",
@@ -1642,10 +1644,10 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 20,
     fontWeight: "700",
-    color: "#0C1B33",
+    color: "#FFFFFF",
   },
   closeButton: {
-    color: "#0C1B33",
+    color: "rgba(255,255,255,0.8)",
     fontWeight: "600",
   },
   modalScroll: {
@@ -1664,18 +1666,18 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   label: {
-    color: "#0C1B33",
+    color: "rgba(255,255,255,0.85)",
     fontWeight: "600",
   },
   input: {
     borderWidth: 1,
-    borderColor: "rgba(12,27,51,0.16)",
+    borderColor: "rgba(255,255,255,0.2)",
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 16,
-    color: "#0C1B33",
-    backgroundColor: "#FFFFFF",
+    color: "#FFFFFF",
+    backgroundColor: "rgba(255,255,255,0.1)",
   },
   inputMultiline: {
     minHeight: 96,
@@ -1690,44 +1692,48 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: 12,
-    backgroundColor: "rgba(12,27,51,0.1)",
+    backgroundColor: "rgba(255,255,255,0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.2)",
   },
   modalSecondaryLabel: {
-    color: "#0C1B33",
+    color: "#FFFFFF",
     fontWeight: "600",
   },
   modalPrimary: {
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: 12,
-    backgroundColor: "#0C1B33",
+    backgroundColor: "#50E3C2",
   },
   modalPrimaryLabel: {
-    color: "#FFFFFF",
-    fontWeight: "600",
+    color: "#0C1B33",
+    fontWeight: "700",
   },
   memberCard: {
-    backgroundColor: "rgba(12, 27, 51, 0.05)",
+    backgroundColor: "rgba(255,255,255,0.06)",
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
   },
   memberInfo: {
     gap: 4,
   },
   memberName: {
-    color: "#0C1B33",
+    color: "#FFFFFF",
     fontSize: 16,
     fontWeight: "700",
   },
   memberRole: {
-    color: "rgba(12,27,51,0.6)",
+    color: "rgba(255,255,255,0.6)",
   },
   memberPhone: {
-    color: "rgba(12,27,51,0.75)",
+    color: "rgba(255,255,255,0.75)",
   },
   memberPayment: {
-    color: "rgba(12,27,51,0.75)",
+    color: "rgba(255,255,255,0.7)",
     fontStyle: "italic",
   },
   memberActions: {
@@ -1738,7 +1744,7 @@ const styles = StyleSheet.create({
   },
   memberAction: {
     borderWidth: 1,
-    borderColor: "rgba(12,27,51,0.2)",
+    borderColor: "rgba(255,255,255,0.2)",
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 8,
@@ -1747,11 +1753,11 @@ const styles = StyleSheet.create({
     borderColor: "#D64545",
   },
   memberActionLabel: {
-    color: "#0C1B33",
+    color: "#FFFFFF",
     fontWeight: "600",
   },
   invitationCard: {
-    backgroundColor: "rgba(12, 27, 51, 0.08)",
+    backgroundColor: "rgba(255,255,255,0.08)",
     borderRadius: 12,
     padding: 16,
     gap: 12,
@@ -1820,18 +1826,18 @@ const styles = StyleSheet.create({
     color: "rgba(255,255,255,0.65)",
   },
   requestCard: {
-    backgroundColor: "rgba(12, 27, 51, 0.08)",
+    backgroundColor: "rgba(255,255,255,0.08)",
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
     gap: 8,
   },
   requestName: {
-    color: "#0C1B33",
+    color: "#FFFFFF",
     fontWeight: "700",
   },
   requestInfo: {
-    color: "rgba(12,27,51,0.7)",
+    color: "rgba(255,255,255,0.7)",
   },
   requestActions: {
     flexDirection: "row",
@@ -1844,14 +1850,19 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   requestDecline: {
-    backgroundColor: "rgba(12,27,51,0.08)",
+    backgroundColor: "transparent",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.25)",
   },
   requestAccept: {
-    backgroundColor: "#0C1B33",
+    backgroundColor: "#50E3C2",
   },
   requestButtonLabel: {
     color: "#FFFFFF",
     fontWeight: "600",
+  },
+  requestButtonLabelAccent: {
+    color: "#0C1B33",
   },
   switchRow: {
     flexDirection: "row",
@@ -1900,7 +1911,7 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   confirmText: {
-    color: "#0C1B33",
+    color: "rgba(255,255,255,0.85)",
   },
   emptyText: {
     color: "rgba(255,255,255,0.65)",
@@ -1910,16 +1921,16 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   adminName: {
-    color: "#0C1B33",
+    color: "#FFFFFF",
     fontSize: 24,
     fontWeight: "700",
   },
   adminPhone: {
-    color: "rgba(12,27,51,0.75)",
+    color: "rgba(255,255,255,0.75)",
     fontSize: 16,
   },
   adminPhoneHint: {
-    color: "rgba(12,27,51,0.6)",
+    color: "rgba(255,255,255,0.55)",
     fontSize: 14,
     fontStyle: "italic",
   },
