@@ -112,6 +112,27 @@ L'API est exposée sur `http://localhost:<PORT>` et le WebSocket sur le même po
    ```
 3. Ouvrez `http://localhost:3000` pour accéder à l’interface web Trip Crew.
 
+## Démarrer le mobile
+
+1. Installer les dépendances Expo (une seule fois) :
+   ```bash
+   cd mobile
+   npm install
+   ```
+2. Exposer l'URL publique de l'API au mobile via la variable `EXPO_PUBLIC_API_BASE_URL` (exemple : `http://192.168.1.42:5000/api`). Vous pouvez la définir dans un fichier `.env` à la racine du dossier `mobile` :
+   ```env
+   EXPO_PUBLIC_API_BASE_URL=http://192.168.1.42:5000/api
+   ```
+3. Lancer Metro :
+   ```bash
+   npm run start
+   ```
+4. Depuis l'application Expo Go ou un émulateur :
+   - Android : `npm run android`
+   - iOS (depuis macOS ou Expo Go) : `npm run ios`
+   - Web : `npm run web`
+5. Le projet mobile utilise Expo Router, React Query et Axios. La logique métier (API, check-in, invitations) peut être mutualisée avec le front en créant des modules TypeScript partagés.
+
 ## Ressources complémentaires
 
 - Collection Postman : `docs/postman/TripCrew.postman_collection.json`
