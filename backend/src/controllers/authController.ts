@@ -151,15 +151,28 @@ export const updateProfile = async (req: Request, res: Response): Promise<void> 
       return;
     }
 
-    const { email, firstName, lastName, phone, avatarUrl } = req.body as {
+    const {
+      email,
+      firstName,
+      lastName,
+      phone,
+      avatarUrl,
+      currentPassword,
+      newPassword,
+      confirmPassword,
+    } = req.body as {
       email?: string;
       firstName?: string;
       lastName?: string;
       phone?: string;
       avatarUrl?: string | null;
+      currentPassword?: string;
+      newPassword?: string;
+      confirmPassword?: string;
     };
 
     if (phone !== undefined && !phone.trim()) {
+      console.warn(`[auth] updateProfile rejected: empty phone`, { userId });
       res.status(400).json({ error: 'Phone number cannot be empty' });
       return;
     }
@@ -172,6 +185,7 @@ export const updateProfile = async (req: Request, res: Response): Promise<void> 
         lastName: true,
         phone: true,
         avatarUrl: true,
+        password: true,
       },
     });
 
@@ -193,6 +207,10 @@ export const updateProfile = async (req: Request, res: Response): Promise<void> 
           select: { id: true },
         });
         if (existingEmail) {
+          console.warn(`[auth] updateProfile rejected: email already used`, {
+            userId,
+            normalizedEmail,
+          });
           res.status(400).json({ error: 'Email already in use' });
           return;
         }
@@ -213,10 +231,70 @@ export const updateProfile = async (req: Request, res: Response): Promise<void> 
           select: { id: true },
         });
         if (existingPhone) {
+          console.warn(`[auth] updateProfile rejected: phone already used`, {
+            userId,
+            normalizedPhone,
+          });
           res.status(400).json({ error: 'Phone number already in use' });
           return;
         }
       }
+    }
+
+    const wantsPasswordChange =
+      Boolean(currentPassword && currentPassword.trim()) ||
+      Boolean(newPassword && newPassword.trim()) ||
+      Boolean(confirmPassword && confirmPassword.trim());
+
+    if (wantsPasswordChange) {
+      if (!currentPassword?.trim() || !newPassword?.trim() || !confirmPassword?.trim()) {
+        console.warn(`[auth] updateProfile rejected: missing password fields`, { userId });
+        res
+          .status(400)
+          .json({ error: 'Pour changer ton mot de passe, indique le mot de passe actuel et le nouveau mot de passe.' });
+        return;
+      }
+    }
+
+    if ((currentPassword && !newPassword) || (!currentPassword && newPassword)) {
+      res.status(400).json({ error: 'Pour changer le mot de passe, remplis les deux champs.' });
+      return;
+    }
+
+    if (newPassword && newPassword.length < 8) {
+      console.warn(`[auth] updateProfile rejected: new password too short`, {
+        userId,
+      });
+      res.status(400).json({ error: 'Le nouveau mot de passe doit comporter au moins 8 caractères.' });
+      return;
+    }
+
+    if (newPassword && confirmPassword && newPassword !== confirmPassword) {
+      console.warn(`[auth] updateProfile rejected: password confirmation mismatch`, {
+        userId,
+      });
+      res.status(400).json({ error: 'La confirmation ne correspond pas au nouveau mot de passe.' });
+      return;
+    }
+
+    let passwordHash: string | undefined;
+
+    if (currentPassword && newPassword) {
+      const matches = await bcrypt.compare(currentPassword, current.password);
+      if (!matches) {
+        console.warn(`[auth] updateProfile rejected: current password mismatch`, { userId });
+        res.status(400).json({ error: 'Mot de passe actuel incorrect.' });
+        return;
+      }
+
+      const isSamePassword = await bcrypt.compare(newPassword, current.password);
+      if (isSamePassword) {
+        console.warn(`[auth] updateProfile rejected: password unchanged`, { userId });
+        res.status(400).json({ error: 'Indique un mot de passe différent de l’actuel.' });
+        return;
+      }
+
+      passwordHash = await bcrypt.hash(newPassword, 10);
     }
 
     const updated = await prisma.user.update({
@@ -226,7 +304,8 @@ export const updateProfile = async (req: Request, res: Response): Promise<void> 
         firstName: firstName ?? current.firstName,
         lastName: lastName ?? current.lastName,
         phone: normalizedPhone ?? current.phone,
-        avatarUrl: avatarUrl ?? current.avatarUrl,
+        ...(avatarUrl !== undefined ? { avatarUrl: avatarUrl ?? null } : {}),
+        ...(passwordHash ? { password: passwordHash } : {}),
       },
       select: {
         id: true,

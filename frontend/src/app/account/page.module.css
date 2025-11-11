@@ -47,11 +47,23 @@
   gap: 16px;
 }
 
+.sectionTitle {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
 .label {
   display: grid;
   gap: 8px;
   font-weight: 600;
   font-size: 0.98rem;
+}
+
+.fieldError {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: rgba(248, 113, 113, 0.9);
 }
 
 .input {

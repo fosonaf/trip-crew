@@ -95,6 +95,9 @@ export const authApi = {
     lastName?: string;
     phone?: string;
     avatarUrl?: string | null;
+    currentPassword?: string;
+    newPassword?: string;
+    confirmPassword?: string;
   }) =>
     apiFetch<{ user: User }>("/api/auth/profile", {
       method: "PUT",
