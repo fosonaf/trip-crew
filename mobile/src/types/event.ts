@@ -36,3 +36,11 @@ export type EventSummary = {
   organizerCount: number;
 };
 
+export type PendingInvitation = {
+  memberId: number;
+  eventId: number;
+  eventName: string;
+  startDate: string | null;
+  inviter: string | null;
+};
+

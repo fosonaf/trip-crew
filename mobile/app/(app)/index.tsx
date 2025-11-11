@@ -14,7 +14,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
 import { useAuth } from "@/hooks/use-auth";
 import { eventApi } from "@/api/events";
-import type { EventSummary } from "@/types/event";
+import { invitationApi } from "@/api/invitations";
+import type { EventSummary, PendingInvitation } from "@/types/event";
 
 export default function AppHomeScreen() {
   const router = useRouter();
@@ -29,6 +30,11 @@ export default function AppHomeScreen() {
   const eventsQuery = useQuery({
     queryKey: ["events"],
     queryFn: eventApi.list,
+  });
+
+  const pendingInvitationsQuery = useQuery({
+    queryKey: ["invitations", "pending"],
+    queryFn: invitationApi.pending,
   });
 
   const leaveMutation = useMutation({
@@ -65,6 +71,49 @@ export default function AppHomeScreen() {
       }
       setJoinError(message);
       setJoinSuccess(null);
+    },
+  });
+
+  const acceptInvitationMutation = useMutation({
+    mutationFn: (memberId: number) => invitationApi.accept(memberId),
+    onSuccess: async (data) => {
+      setFeedback(data.message ?? "Invitation acceptée !");
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["invitations", "pending"] }),
+        queryClient.invalidateQueries({ queryKey: ["events"] }),
+      ]);
+      setTimeout(() => setFeedback(null), 4000);
+    },
+    onError: (err) => {
+      let message = "Impossible d’accepter l’invitation pour le moment.";
+      if (isAxiosError(err)) {
+        const data = err.response?.data as { message?: string; error?: string } | undefined;
+        message = data?.message ?? data?.error ?? message;
+      } else if (err instanceof Error) {
+        message = err.message;
+      }
+      setFeedback(message);
+      setTimeout(() => setFeedback(null), 5000);
+    },
+  });
+
+  const declineInvitationMutation = useMutation({
+    mutationFn: (memberId: number) => invitationApi.decline(memberId),
+    onSuccess: async (data) => {
+      setFeedback(data.message ?? "Invitation refusée.");
+      await queryClient.invalidateQueries({ queryKey: ["invitations", "pending"] });
+      setTimeout(() => setFeedback(null), 4000);
+    },
+    onError: (err) => {
+      let message = "Impossible de refuser l’invitation pour le moment.";
+      if (isAxiosError(err)) {
+        const data = err.response?.data as { message?: string; error?: string } | undefined;
+        message = data?.message ?? data?.error ?? message;
+      } else if (err instanceof Error) {
+        message = err.message;
+      }
+      setFeedback(message);
+      setTimeout(() => setFeedback(null), 5000);
     },
   });
 
@@ -180,6 +229,54 @@ export default function AppHomeScreen() {
     </Pressable>
   );
 
+  const renderInvitationCard = (invitation: PendingInvitation) => (
+    <View key={invitation.memberId} style={styles.invitationCard}>
+      <View style={styles.invitationHeader}>
+        <Text style={styles.invitationTitle}>{invitation.eventName}</Text>
+        {invitation.startDate ? (
+          <Text style={styles.invitationDate}>
+            Début le {formatDateTime(invitation.startDate)}
+          </Text>
+        ) : null}
+      </View>
+      {invitation.inviter ? (
+        <Text style={styles.invitationInviter}>
+          Invité par <Text style={styles.accent}>{invitation.inviter}</Text>
+        </Text>
+      ) : null}
+      <View style={styles.invitationActions}>
+        <Pressable
+          style={({ pressed }) => [
+            styles.invitationDecline,
+            (declineInvitationMutation.isPending || acceptInvitationMutation.isPending) &&
+              styles.disabledButton,
+            pressed && styles.buttonPressed,
+          ]}
+          onPress={() => declineInvitationMutation.mutate(invitation.memberId)}
+          disabled={declineInvitationMutation.isPending || acceptInvitationMutation.isPending}
+        >
+          <Text style={styles.invitationDeclineLabel}>
+            {declineInvitationMutation.isPending ? "Refus..." : "Refuser"}
+          </Text>
+        </Pressable>
+        <Pressable
+          style={({ pressed }) => [
+            styles.invitationAccept,
+            (acceptInvitationMutation.isPending || declineInvitationMutation.isPending) &&
+              styles.disabledButton,
+            pressed && styles.buttonPressed,
+          ]}
+          onPress={() => acceptInvitationMutation.mutate(invitation.memberId)}
+          disabled={acceptInvitationMutation.isPending || declineInvitationMutation.isPending}
+        >
+          <Text style={styles.invitationAcceptLabel}>
+            {acceptInvitationMutation.isPending ? "Accept..." : "Accepter"}
+          </Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+
   return (
     <View style={styles.screen}>
       <Stack.Screen
@@ -212,6 +309,37 @@ export default function AppHomeScreen() {
             </Pressable>
           </View>
         </View>
+
+        {pendingInvitationsQuery.isLoading ||
+        pendingInvitationsQuery.isError ||
+        (pendingInvitationsQuery.data && pendingInvitationsQuery.data.length > 0) ? (
+          <View style={styles.invitationsCard}>
+            <View style={styles.invitationsHeader}>
+              <Text style={styles.invitationsTitle}>Tes invitations</Text>
+              <Text style={styles.invitationsSubtitle}>
+                Accepte ou refuse les invitations reçues pour rejoindre un évènement.
+              </Text>
+            </View>
+            {pendingInvitationsQuery.isLoading ? (
+              <View style={styles.loading}>
+                <ActivityIndicator size="small" color="#50E3C2" />
+                <Text style={styles.loadingText}>Chargement des invitations…</Text>
+              </View>
+            ) : pendingInvitationsQuery.isError ? (
+              <Text style={styles.errorText}>
+                {pendingInvitationsQuery.error instanceof Error
+                  ? pendingInvitationsQuery.error.message
+                  : "Impossible de récupérer tes invitations pour le moment."}
+              </Text>
+            ) : pendingInvitationsQuery.data && pendingInvitationsQuery.data.length > 0 ? (
+              <View style={styles.invitationList}>
+                {pendingInvitationsQuery.data.map(renderInvitationCard)}
+              </View>
+            ) : (
+              <Text style={styles.emptyInvitation}>Aucune invitation en attente.</Text>
+            )}
+          </View>
+        ) : null}
 
         <View style={styles.eventsCard}>
           <View style={styles.eventsHeader}>
@@ -386,6 +514,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     gap: 16,
+    paddingRight: 4,
   },
   eventsTitle: {
     fontSize: 20,
@@ -403,7 +532,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(80, 227, 194, 0.2)",
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 12,
+    paddingHorizontal: 16,
   },
   counterLabel: {
     color: "#50E3C2",
@@ -579,6 +708,79 @@ const styles = StyleSheet.create({
   modalPrimaryLabel: {
     color: "#FFFFFF",
     fontWeight: "600",
+  },
+  invitationsCard: {
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderRadius: 24,
+    padding: 24,
+    gap: 16,
+  },
+  invitationsHeader: {
+    gap: 8,
+  },
+  invitationsTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+  invitationsSubtitle: {
+    fontSize: 14,
+    color: "rgba(255,255,255,0.65)",
+  },
+  invitationList: {
+    gap: 12,
+  },
+  emptyInvitation: {
+    color: "rgba(255,255,255,0.65)",
+    fontSize: 14,
+  },
+  invitationCard: {
+    backgroundColor: "rgba(12, 27, 51, 0.6)",
+    borderRadius: 16,
+    padding: 16,
+    gap: 12,
+  },
+  invitationHeader: {
+    gap: 4,
+  },
+  invitationTitle: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  invitationDate: {
+    color: "rgba(255,255,255,0.65)",
+    fontSize: 13,
+  },
+  invitationInviter: {
+    color: "rgba(255,255,255,0.7)",
+    fontSize: 14,
+  },
+  invitationActions: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 12,
+  },
+  invitationDecline: {
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.3)",
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  invitationAccept: {
+    backgroundColor: "#50E3C2",
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  invitationDeclineLabel: {
+    color: "rgba(255,255,255,0.85)",
+    fontWeight: "600",
+  },
+  invitationAcceptLabel: {
+    color: "#0C1B33",
+    fontWeight: "700",
   },
 });
 
