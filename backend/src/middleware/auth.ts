@@ -81,7 +81,7 @@ export const isEventOrganizer = async (
       where: {
         eventId: Number(eventId),
         userId,
-        role: 'organizer',
+        role: { in: ['organizer', 'admin'] },
         status: 'active',
       },
       select: { id: true },

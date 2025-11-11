@@ -71,7 +71,7 @@ export const createEvent = async (req: Request, res: Response): Promise<void> =>
       data: {
         eventId: event.id,
         userId,
-        role: 'organizer',
+      role: 'admin',
         paymentStatus: 'paid',
         status: 'active',
         qrCode,
@@ -139,7 +139,7 @@ export const getEvents = async (req: Request, res: Response): Promise<void> => {
             by: ['eventId'],
             where: {
               eventId: { in: eventIds },
-              role: 'organizer',
+              role: { in: ['organizer', 'admin'] },
               status: 'active',
             },
             _count: { eventId: true },
@@ -162,7 +162,8 @@ export const getEvents = async (req: Request, res: Response): Promise<void> => {
       location: membership.event.location,
       isPaid: membership.event.isPaid,
       price: membership.event.price ? Number(membership.event.price) : null,
-      role: membership.role,
+      role:
+        membership.userId === membership.event.createdBy ? 'admin' : membership.role,
       paymentStatus: membership.paymentStatus,
       status: membership.status,
       memberId: membership.id,
@@ -198,7 +199,8 @@ export const getEventById = async (req: Request, res: Response): Promise<void> =
       return;
     }
 
-    const isOrganizer = membership.role === 'organizer';
+    const isOrganizer =
+      membership.role === 'organizer' || membership.role === 'admin';
 
     const event = await prisma.event.findUnique({
       where: { id: Number(eventId) },
@@ -288,7 +290,7 @@ export const getEventById = async (req: Request, res: Response): Promise<void> =
       lastName: member.user.lastName,
       email: member.user.email,
       phone: member.user.phone,
-      role: member.role,
+      role: member.user.id === event.createdBy ? 'admin' : member.role,
       paymentStatus: member.paymentStatus,
       status: member.status,
       invitedBy: member.invitedBy,

@@ -28,7 +28,7 @@ export interface EventMember {
   id: number;
   eventId: number;
   userId: number;
-  role: 'organizer' | 'member';
+  role: 'admin' | 'organizer' | 'member';
   paymentStatus: 'pending' | 'paid' | 'refunded';
   status: 'active' | 'pending';
   invitedBy?: number | null;

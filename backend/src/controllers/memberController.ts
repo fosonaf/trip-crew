@@ -120,7 +120,7 @@ export const updateMemberRole = async (req: Request, res: Response): Promise<voi
         where: {
           eventId: Number(eventId),
           status: 'active',
-          role: 'organizer',
+          role: { in: ['organizer', 'admin'] },
           id: { not: targetMember.id },
         },
       });
@@ -185,12 +185,22 @@ export const transferEventAdmin = async (req: Request, res: Response): Promise<v
     }
 
     await prisma.$transaction(async (tx) => {
-      if (targetMember.role !== 'organizer') {
+      const currentAdminMembership = await tx.eventMember.findFirst({
+        where: { eventId: Number(eventId), userId: event.createdBy },
+        select: { id: true },
+      });
+
+      if (currentAdminMembership) {
         await tx.eventMember.update({
-          where: { id: targetMember.id },
+          where: { id: currentAdminMembership.id },
           data: { role: 'organizer' },
         });
       }
+
+      await tx.eventMember.update({
+        where: { id: targetMember.id },
+        data: { role: 'admin' },
+      });
 
       await tx.event.update({
         where: { id: Number(eventId) },
@@ -279,7 +289,9 @@ export const removeMember = async (req: Request, res: Response): Promise<void> =
       return;
     }
 
-    if (membership.role === 'organizer') {
+    const isOrganizerRole = membership.role === 'organizer' || membership.role === 'admin';
+
+    if (isOrganizerRole) {
       if (actingUserId !== event.createdBy) {
         res.status(403).json({ error: 'Seul l’administrateur peut retirer un organisateur.' });
         return;
@@ -293,7 +305,7 @@ export const removeMember = async (req: Request, res: Response): Promise<void> =
       const organizerCount = await prisma.eventMember.count({
         where: {
           eventId: membership.eventId,
-          role: 'organizer',
+          role: { in: ['organizer', 'admin'] },
           status: 'active',
         },
       });
@@ -312,7 +324,10 @@ export const removeMember = async (req: Request, res: Response): Promise<void> =
         select: { role: true },
       });
 
-      if (!actorMembership || actorMembership.role !== 'organizer') {
+      if (
+        !actorMembership ||
+        !['organizer', 'admin'].includes(actorMembership.role)
+      ) {
         res.status(403).json({ error: 'Seuls les organisateurs peuvent retirer un membre.' });
         return;
       }
@@ -943,7 +958,7 @@ export const leaveEvent = async (req: Request, res: Response): Promise<void> => 
       const organizerCount = await prisma.eventMember.count({
         where: {
           eventId: membership.eventId,
-          role: 'organizer',
+          role: { in: ['organizer', 'admin'] },
           status: 'active',
         },
       });
