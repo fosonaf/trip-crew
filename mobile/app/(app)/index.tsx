@@ -1,53 +1,584 @@
-import { Link, Stack } from "expo-router";
-import { StyleSheet, Text, View } from "react-native";
+import { useMemo, useState } from "react";
+import { Stack, useRouter } from "expo-router";
+import {
+  ActivityIndicator,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { isAxiosError } from "axios";
+import { useAuth } from "@/hooks/use-auth";
+import { eventApi } from "@/api/events";
+import type { EventSummary } from "@/types/event";
 
 export default function AppHomeScreen() {
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const [feedback, setFeedback] = useState<string | null>(null);
+  const [joinModalVisible, setJoinModalVisible] = useState(false);
+  const [joinEventId, setJoinEventId] = useState("");
+  const [joinError, setJoinError] = useState<string | null>(null);
+  const [joinSuccess, setJoinSuccess] = useState<string | null>(null);
+
+  const eventsQuery = useQuery({
+    queryKey: ["events"],
+    queryFn: eventApi.list,
+  });
+
+  const leaveMutation = useMutation({
+    mutationFn: (eventId: number) => eventApi.leave(eventId),
+    onSuccess: async () => {
+      setFeedback("Tu as quitté l’évènement.");
+      await queryClient.invalidateQueries({ queryKey: ["events"] });
+      setTimeout(() => setFeedback(null), 4000);
+    },
+    onError: (err) => {
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Impossible de quitter l’évènement pour le moment.";
+      setFeedback(message);
+      setTimeout(() => setFeedback(null), 5000);
+    },
+  });
+
+  const joinMutation = useMutation({
+    mutationFn: (eventId: string) => eventApi.requestJoin(eventId),
+    onSuccess: (data) => {
+      setJoinSuccess(data.message);
+      setJoinError(null);
+      setJoinEventId("");
+    },
+    onError: (err) => {
+      let message = "Impossible d’envoyer la demande pour le moment.";
+      if (isAxiosError(err)) {
+        const data = err.response?.data as { message?: string; error?: string } | undefined;
+        message = data?.message ?? data?.error ?? message;
+      } else if (err instanceof Error) {
+        message = err.message;
+      }
+      setJoinError(message);
+      setJoinSuccess(null);
+    },
+  });
+
+  const openJoinModal = () => {
+    setJoinModalVisible(true);
+    setJoinEventId("");
+    setJoinError(null);
+    setJoinSuccess(null);
+  };
+
+  const closeJoinModal = () => {
+    if (joinMutation.isPending) return;
+    setJoinModalVisible(false);
+  };
+
+  const handleJoin = () => {
+    if (!joinEventId.trim()) {
+      setJoinError("Merci d’indiquer l’identifiant de l’évènement.");
+      setJoinSuccess(null);
+      return;
+    }
+    setJoinError(null);
+    setJoinSuccess(null);
+    joinMutation.mutate(joinEventId.trim());
+  };
+
+  const formatName = useMemo(() => {
+    if (!user?.firstName) {
+      return "Trip Crew";
+    }
+    return user.firstName.charAt(0).toUpperCase() + user.firstName.slice(1).toLowerCase();
+  }, [user?.firstName]);
+
+  const formatDateTime = (value: string) => {
+    const date = new Date(value);
+    if (Number.isNaN(date.valueOf())) {
+      return "Date inconnue";
+    }
+    return new Intl.DateTimeFormat("fr-FR", {
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(date);
+  };
+
+  const renderEventCard = (event: EventSummary) => (
+    <Pressable
+      key={event.id}
+      style={({ pressed }) => [styles.eventCard, pressed && styles.cardPressed]}
+      onPress={() => router.push(`/(app)/events/${event.id}`)}
+    >
+      <View style={styles.eventHeader}>
+        <Text style={styles.eventTitle}>{event.name}</Text>
+        {event.role === "admin" || event.role === "organizer" ? (
+          <View style={styles.badge}>
+            <View style={styles.badgeDot} />
+            <Text style={styles.badgeLabel}>
+              {event.role === "admin" ? "Administrateur" : "Organisateur"}
+            </Text>
+          </View>
+        ) : null}
+      </View>
+      {event.description ? <Text style={styles.eventDescription}>{event.description}</Text> : null}
+      <View style={styles.eventMeta}>
+        <View style={styles.metaItem}>
+          <Text style={styles.metaLabel}>Début</Text>
+          <Text style={styles.metaValue}>{formatDateTime(event.startDate)}</Text>
+        </View>
+        <View style={styles.metaItem}>
+          <Text style={styles.metaLabel}>Fin</Text>
+          <Text style={styles.metaValue}>{formatDateTime(event.endDate)}</Text>
+        </View>
+        <View style={styles.metaItem}>
+          <Text style={styles.metaLabel}>Lieu</Text>
+          <Text style={styles.metaValue}>{event.location || "Non précisé"}</Text>
+        </View>
+        <View style={styles.metaItem}>
+          <Text style={styles.metaLabel}>Tarif</Text>
+          <Text style={styles.metaValue}>
+            {event.isPaid
+              ? `${event.price?.toLocaleString("fr-FR", {
+                  minimumFractionDigits: 0,
+                  maximumFractionDigits: 2,
+                })} €`
+              : "Gratuit"}
+          </Text>
+        </View>
+      </View>
+      <Pressable
+        style={[
+          styles.leaveButton,
+          (event.role === "admin" ||
+            (event.role === "organizer" && event.organizerCount <= 1) ||
+            leaveMutation.isPending) &&
+            styles.disabledButton,
+        ]}
+        onPress={() => leaveMutation.mutate(event.id)}
+        disabled={
+          event.role === "admin" ||
+          (event.role === "organizer" && event.organizerCount <= 1) ||
+          leaveMutation.isPending
+        }
+      >
+        <Text style={styles.leaveButtonLabel}>
+          {event.role === "admin"
+            ? "Administrateur"
+            : event.role === "organizer" && event.organizerCount <= 1
+              ? "Dernier organisateur"
+              : leaveMutation.isPending
+                ? "Départ..."
+                : "Quitter l’évènement"}
+        </Text>
+      </Pressable>
+    </Pressable>
+  );
+
   return (
-    <>
+    <View style={styles.screen}>
       <Stack.Screen
         options={{
           title: "Accueil",
         }}
       />
-      <View style={styles.container}>
-        <Text style={styles.title}>Bienvenue sur Trip Crew 🚀</Text>
-        <Text style={styles.subtitle}>
-          L’application mobile partage les mêmes fonctionnalités que le web, tout en ajoutant les
-          scénarios terrain (invitation SMS/WhatsApp, contrôle de présence, scan QR code).
-        </Text>
-        <Link href="/(app)/events" style={styles.link}>
-          Voir les événements
-        </Link>
-      </View>
-    </>
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <View style={styles.heroCard}>
+          <Text style={styles.greeting}>
+            Bienvenue <Text style={styles.accent}>{formatName}</Text> 👋
+          </Text>
+          {feedback ? <Text style={styles.feedback}>{feedback}</Text> : null}
+          <Text style={styles.heroSubtitle}>
+            Prépare ton prochain voyage en invitant ton équipe, planifie chaque étape et reste
+            synchronisé avec le chat temps réel.
+          </Text>
+          <View style={styles.heroActions}>
+            <Pressable
+              style={({ pressed }) => [styles.primaryButton, pressed && styles.buttonPressed]}
+              onPress={() => router.push("/(app)/events/new")}
+            >
+              <Text style={styles.primaryButtonLabel}>Créer un événement</Text>
+            </Pressable>
+            <Pressable
+              style={({ pressed }) => [styles.secondaryButton, pressed && styles.buttonPressed]}
+              onPress={openJoinModal}
+            >
+              <Text style={styles.secondaryButtonLabel}>Rejoindre un événement</Text>
+            </Pressable>
+          </View>
+        </View>
+
+        <View style={styles.eventsCard}>
+          <View style={styles.eventsHeader}>
+            <View>
+              <Text style={styles.eventsTitle}>Tes évènements</Text>
+              <Text style={styles.eventsSubtitle}>
+                Tous les voyages auxquels tu participes, en tant qu’organisateur ou membre.
+              </Text>
+            </View>
+            <View style={styles.counter}>
+              <Text style={styles.counterLabel}>
+                {eventsQuery.data?.length ?? (eventsQuery.isLoading ? "-" : "0")}
+              </Text>
+            </View>
+          </View>
+
+          {eventsQuery.isLoading ? (
+            <View style={styles.loading}>
+              <ActivityIndicator size="large" color="#50E3C2" />
+              <Text style={styles.loadingText}>Chargement en cours…</Text>
+            </View>
+          ) : eventsQuery.isError ? (
+            <Text style={styles.errorText}>
+              {eventsQuery.error instanceof Error
+                ? eventsQuery.error.message
+                : "Impossible de récupérer tes évènements pour le moment."}
+            </Text>
+          ) : eventsQuery.data && eventsQuery.data.length > 0 ? (
+            <View style={styles.eventsList}>{eventsQuery.data.map(renderEventCard)}</View>
+          ) : (
+            <View style={styles.empty}>
+              <Text style={styles.emptyText}>
+                Tu n’as encore rejoint aucun évènement. Lance-toi en créant le premier !
+              </Text>
+              <Pressable
+                style={({ pressed }) => [styles.primaryButton, pressed && styles.buttonPressed]}
+                onPress={() => router.push("/(app)/events/new")}
+              >
+                <Text style={styles.primaryButtonLabel}>Nouveau évènement</Text>
+              </Pressable>
+            </View>
+          )}
+        </View>
+      </ScrollView>
+
+      <Modal
+        visible={joinModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={closeJoinModal}
+      >
+        <Pressable style={styles.modalOverlay} onPress={closeJoinModal}>
+          <Pressable style={styles.modalContent} onPress={(event) => event.stopPropagation()}>
+            <Text style={styles.modalTitle}>Rejoindre un évènement</Text>
+            <Text style={styles.modalSubtitle}>
+              Demande envoyée uniquement si l’évènement existe et que tu n’en fais pas encore partie.
+            </Text>
+            <TextInput
+              value={joinEventId}
+              onChangeText={setJoinEventId}
+              placeholder="Identifiant (ex : 123)"
+              placeholderTextColor="rgba(12,27,51,0.4)"
+              keyboardType="number-pad"
+              style={styles.modalInput}
+              editable={!joinMutation.isPending}
+            />
+            {joinError ? <Text style={styles.modalError}>{joinError}</Text> : null}
+            {joinSuccess ? <Text style={styles.modalSuccess}>{joinSuccess}</Text> : null}
+            <View style={styles.modalActions}>
+              <Pressable
+                style={({ pressed }) => [styles.modalSecondary, pressed && styles.buttonPressed]}
+                onPress={closeJoinModal}
+                disabled={joinMutation.isPending}
+              >
+                <Text style={styles.modalSecondaryLabel}>Annuler</Text>
+              </Pressable>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.modalPrimary,
+                  joinMutation.isPending && styles.disabledButton,
+                  pressed && styles.buttonPressed,
+                ]}
+                onPress={handleJoin}
+                disabled={joinMutation.isPending}
+              >
+                <Text style={styles.modalPrimaryLabel}>
+                  {joinMutation.isPending ? "Envoi..." : "Envoyer la demande"}
+                </Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  screen: {
     flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 24,
     backgroundColor: "#0C1B33",
+  },
+  scrollContent: {
+    padding: 24,
+    gap: 24,
+  },
+  heroCard: {
+    backgroundColor: "rgba(12, 27, 51, 0.6)",
+    borderRadius: 24,
+    padding: 24,
     gap: 16,
   },
-  title: {
-    fontSize: 22,
+  greeting: {
+    fontSize: 24,
     fontWeight: "700",
     color: "#FFFFFF",
-    textAlign: "center",
   },
-  subtitle: {
+  accent: {
+    color: "#50E3C2",
+  },
+  heroSubtitle: {
     fontSize: 16,
+    color: "rgba(255,255,255,0.7)",
     lineHeight: 22,
-    color: "rgba(255,255,255,0.8)",
-    textAlign: "center",
   },
-  link: {
+  heroActions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+  },
+  primaryButton: {
+    backgroundColor: "#50E3C2",
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderRadius: 14,
+  },
+  primaryButtonLabel: {
+    color: "#0C1B33",
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  secondaryButton: {
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.3)",
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderRadius: 14,
+  },
+  secondaryButtonLabel: {
+    color: "#FFFFFF",
     fontSize: 16,
     fontWeight: "600",
+  },
+  buttonPressed: {
+    opacity: 0.7,
+  },
+  feedback: {
+    backgroundColor: "rgba(80, 227, 194, 0.12)",
+    borderRadius: 12,
+    padding: 12,
+    color: "#9CF2DE",
+    fontWeight: "600",
+  },
+  eventsCard: {
+    backgroundColor: "rgba(12, 27, 51, 0.6)",
+    borderRadius: 24,
+    padding: 24,
+    gap: 20,
+  },
+  eventsHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 16,
+  },
+  eventsTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+  eventsSubtitle: {
+    fontSize: 14,
+    color: "rgba(255,255,255,0.65)",
+  },
+  counter: {
+    minWidth: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(80, 227, 194, 0.2)",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 12,
+  },
+  counterLabel: {
     color: "#50E3C2",
+    fontSize: 18,
+    fontWeight: "700",
+  },
+  loading: {
+    alignItems: "center",
+    gap: 12,
+  },
+  loadingText: {
+    color: "rgba(255,255,255,0.7)",
+  },
+  errorText: {
+    color: "#FFB5B5",
+    fontSize: 14,
+  },
+  eventsList: {
+    gap: 16,
+  },
+  eventCard: {
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderRadius: 20,
+    padding: 20,
+    gap: 12,
+  },
+  cardPressed: {
+    opacity: 0.8,
+  },
+  eventHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  eventTitle: {
+    color: "#FFFFFF",
+    fontSize: 18,
+    fontWeight: "700",
+    flex: 1,
+    marginRight: 12,
+  },
+  badge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(80, 227, 194, 0.2)",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+    gap: 6,
+  },
+  badgeDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#50E3C2",
+  },
+  badgeLabel: {
+    color: "#50E3C2",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  eventDescription: {
+    color: "rgba(255,255,255,0.7)",
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  eventMeta: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+  },
+  metaItem: {
+    width: "48%",
+    gap: 4,
+  },
+  metaLabel: {
+    color: "rgba(255,255,255,0.5)",
+    fontSize: 12,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  metaValue: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  leaveButton: {
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.3)",
+    borderRadius: 12,
+    paddingVertical: 10,
+    alignItems: "center",
+  },
+  leaveButtonLabel: {
+    color: "rgba(255,255,255,0.8)",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  disabledButton: {
+    opacity: 0.6,
+  },
+  empty: {
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderRadius: 20,
+    padding: 20,
+    gap: 16,
+    alignItems: "center",
+  },
+  emptyText: {
+    color: "rgba(255,255,255,0.7)",
+    textAlign: "center",
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(12, 27, 51, 0.8)",
+    justifyContent: "center",
+    padding: 24,
+  },
+  modalContent: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 24,
+    padding: 24,
+    gap: 16,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#0C1B33",
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    color: "rgba(12,27,51,0.6)",
+  },
+  modalInput: {
+    borderWidth: 1,
+    borderColor: "rgba(12,27,51,0.16)",
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 16,
+    color: "#0C1B33",
+  },
+  modalError: {
+    color: "#D64545",
+    fontSize: 14,
+  },
+  modalSuccess: {
+    color: "#2E9C6A",
+    fontSize: 14,
+  },
+  modalActions: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 12,
+  },
+  modalSecondary: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: "rgba(12,27,51,0.08)",
+  },
+  modalSecondaryLabel: {
+    color: "#0C1B33",
+    fontWeight: "600",
+  },
+  modalPrimary: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: "#0C1B33",
+  },
+  modalPrimaryLabel: {
+    color: "#FFFFFF",
+    fontWeight: "600",
   },
 });
 
