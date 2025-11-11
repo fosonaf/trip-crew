@@ -239,35 +239,36 @@
 
 .memberHeader {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   justify-content: space-between;
+  gap: 20px;
+}
+
+.memberInfo {
+  display: grid;
+  gap: 8px;
+  flex: 1;
+}
+
+.memberNameRow {
+  display: flex;
+  align-items: center;
   gap: 12px;
+  flex-wrap: wrap;
 }
 
 .memberHeaderActions {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 10px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
+  min-width: 200px;
+  align-items: stretch;
 }
 
 .memberName {
   margin: 0;
   font-size: 1.1rem;
   font-weight: 600;
-}
-
-.roleTag {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 12px;
-  border-radius: 999px;
-  border: 1px solid rgba(59, 130, 246, 0.4);
-  background-color: rgba(59, 130, 246, 0.2);
-  font-weight: 600;
-  font-size: 0.9rem;
 }
 
 .memberStatusBadge {
@@ -280,6 +281,12 @@
   color: var(--text-secondary);
 }
 
+.memberRoleText {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: rgba(148, 163, 184, 0.9);
+}
+
 .memberTransferButton {
   padding: 6px 12px;
   border-radius: 999px;
@@ -289,6 +296,8 @@
   font-weight: 600;
   cursor: pointer;
   transition: transform 150ms ease, box-shadow 150ms ease;
+  width: 100%;
+  text-align: center;
 }
 
 .memberTransferButton:hover {
@@ -305,29 +314,11 @@
   font-weight: 600;
   cursor: pointer;
   transition: transform 150ms ease, box-shadow 150ms ease;
+  width: 100%;
+  text-align: center;
 }
 
 .memberRemoveButton:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 12px 24px rgba(248, 113, 113, 0.25);
-}
-
-.memberRemoveIcon {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  border: 1px solid rgba(248, 113, 113, 0.45);
-  background-color: rgba(248, 113, 113, 0.2);
-  color: rgba(248, 113, 113, 1);
-  font-weight: 700;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: transform 150ms ease, box-shadow 150ms ease, opacity 120ms ease;
-}
-
-.memberRemoveIcon:hover {
   transform: translateY(-1px);
   box-shadow: 0 12px 24px rgba(248, 113, 113, 0.25);
 }

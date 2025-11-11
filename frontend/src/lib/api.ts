@@ -134,6 +134,15 @@ export const eventApi = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
+  updateMemberRole: (
+    eventId: string,
+    memberId: number,
+    payload: { role: "organizer" | "member" },
+  ) =>
+    apiFetch<{ message: string }>(`/api/events/${eventId}/members/${memberId}/role`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    }),
   invite: (eventId: string, payload: { phone: string }) =>
     apiFetch<{ memberId: number; message: string }>(`/api/events/${eventId}/invitations`, {
       method: "POST",

@@ -13,7 +13,13 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useAuthContext } from "@/components/providers/AuthProvider";
 import { ApiError, eventApi } from "@/lib/api";
-import type { CreateEventPayload, CreateStepPayload, EventDetail, EventStep } from "@/types/event";
+import type {
+  CreateEventPayload,
+  CreateStepPayload,
+  EventDetail,
+  EventMember,
+  EventStep,
+} from "@/types/event";
 import styles from "./page.module.css";
 
 const formatDateTime = (value: string) => {
@@ -76,6 +82,7 @@ export default function EventDetailPage() {
   const [isLeaving, setIsLeaving] = useState(false);
   const [isUpdatingEvent, setIsUpdatingEvent] = useState(false);
   const [eventFormError, setEventFormError] = useState<string | null>(null);
+  const [updatingMemberRoleId, setUpdatingMemberRoleId] = useState<number | null>(null);
   const [isEventUpdateConfirmationOpen, setIsEventUpdateConfirmationOpen] = useState(false);
   const [pendingEventUpdate, setPendingEventUpdate] = useState<{
     payload: CreateEventPayload;
@@ -151,7 +158,7 @@ export default function EventDetailPage() {
     fetchEvent(true);
   }, [isHydrated, token, fetchEvent]);
 
-  const organizerName = useMemo(() => {
+  const adminName = useMemo(() => {
     if (!event) return "";
     return `${event.createdBy.firstName} ${event.createdBy.lastName}`.trim();
   }, [event]);
@@ -164,11 +171,14 @@ export default function EventDetailPage() {
   const activeOrganizerCount = useMemo(() => {
     if (!event) return 0;
     return event.members.filter(
-      (member) => member.role === "organizer" && member.status === "active",
+      (member) =>
+        member.status === "active" &&
+        (member.role === "organizer" || member.role === "admin"),
     ).length;
   }, [event]);
 
-  const isOrganizer = currentMember?.role === "organizer";
+  const isOrganizer =
+    currentMember?.role === "organizer" || currentMember?.role === "admin";
   const isAdmin = event && user ? event.createdBy.id === user.id : false;
 
   const pendingJoinRequests = useMemo(() => {
@@ -484,6 +494,35 @@ export default function EventDetailPage() {
             ? err.message
             : "Impossible de retirer ce membre pour le moment.";
       setToast({ message, variant: "error" });
+    }
+  };
+
+  const handleToggleOrganizerRole = async (member: EventMember) => {
+    if (!eventId) return;
+
+    const nextRole = member.role === "organizer" ? "member" : "organizer";
+
+    setUpdatingMemberRoleId(member.id);
+    try {
+      await eventApi.updateMemberRole(eventId, member.id, { role: nextRole });
+      await fetchEvent(false);
+      setToast({
+        message:
+          nextRole === "organizer"
+            ? "Membre promu organisateur."
+            : "Rôle d’organisateur retiré.",
+        variant: "success",
+      });
+    } catch (err) {
+      const message =
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : "Impossible de mettre à jour le rôle pour le moment.";
+      setToast({ message, variant: "error" });
+    } finally {
+      setUpdatingMemberRoleId(null);
     }
   };
 
@@ -1029,8 +1068,8 @@ export default function EventDetailPage() {
                   <dd>{formatPrice(event.isPaid, event.price)}</dd>
                 </div>
                 <div className={styles.metaItem}>
-                  <dt>Organisateur</dt>
-                  <dd>{organizerName || "Inconnu"}</dd>
+                  <dt>Administrateur</dt>
+                  <dd>{adminName || "Inconnu"}</dd>
                 </div>
               </dl>
             </>
@@ -1403,10 +1442,22 @@ export default function EventDetailPage() {
                     }`}
                   >
                     <div className={styles.memberHeader}>
-                      <div>
-                        <h3 className={styles.memberName}>
-                          {member.firstName} {member.lastName}
-                        </h3>
+                      <div className={styles.memberInfo}>
+                        <div className={styles.memberNameRow}>
+                          <h3 className={styles.memberName}>
+                            {member.firstName} {member.lastName}
+                          </h3>
+                          <span className={styles.memberRoleText}>
+                            {member.role === "admin"
+                              ? "Administrateur"
+                              : member.role === "organizer"
+                                ? "Organisateur"
+                                : "Membre"}
+                          </span>
+                          {member.status === "pending" ? (
+                            <span className={styles.memberStatusBadge}>En attente</span>
+                          ) : null}
+                        </div>
                         <p className={styles.memberContact}>
                           Contact :{" "}
                           {(() => {
@@ -1418,15 +1469,9 @@ export default function EventDetailPage() {
                         </p>
                       </div>
                       <div className={styles.memberHeaderActions}>
-                        {member.status === "pending" ? (
-                          <span className={styles.memberStatusBadge}>En attente</span>
-                        ) : null}
-                        {member.role === "organizer" ? (
-                          <span className={styles.roleTag}>Organisateur</span>
-                        ) : null}
                         {isAdmin &&
                         member.status === "active" &&
-                        member.role === "organizer" &&
+                        member.role !== "admin" &&
                         member.userId !== user?.id ? (
                           <button
                             type="button"
@@ -1436,18 +1481,51 @@ export default function EventDetailPage() {
                             Nommer admin
                           </button>
                         ) : null}
+                        {(() => {
+                          const canToggleOrganizer =
+                            member.status === "active" &&
+                            member.role !== "admin" &&
+                            member.userId !== user?.id &&
+                            ((member.role === "member" && isOrganizer) ||
+                              (member.role === "organizer" && isAdmin));
+
+                          if (!canToggleOrganizer) {
+                            return null;
+                          }
+
+                          const isLoading = updatingMemberRoleId === member.id;
+                          const label = isLoading
+                            ? "Mise à jour…"
+                            : member.role === "organizer"
+                              ? "Retirer rôle organisateur"
+                              : "Nommer organisateur";
+
+                          return (
+                            <button
+                              type="button"
+                              className={styles.memberTransferButton}
+                              onClick={() => handleToggleOrganizerRole(member)}
+                              disabled={isLoading}
+                            >
+                              {label}
+                            </button>
+                          );
+                        })()}
                         {isOrganizer && member.status === "pending" ? (
                           <button
                             type="button"
-                            className={styles.memberRemoveIcon}
-                            aria-label="Supprimer l’invitation"
+                            className={styles.memberRemoveButton}
                             onClick={() => handleRemoveInvitation(member.id)}
                           >
-                            ✕
+                            Retirer l’invitation
                           </button>
                         ) : null}
                         {member.status === "active" && member.userId !== user?.id
                           ? (() => {
+                              if (member.role === "admin") {
+                                return null;
+                              }
+
                               if (member.role === "organizer") {
                                 if (!isAdmin) {
                                   return null;
@@ -1459,11 +1537,10 @@ export default function EventDetailPage() {
                               return (
                                 <button
                                   type="button"
-                                  className={styles.memberRemoveIcon}
-                                  aria-label="Retirer ce membre"
+                                  className={styles.memberRemoveButton}
                                   onClick={() => handleRemoveMember(member.id)}
                                 >
-                                  ✕
+                                  Retirer du groupe
                                 </button>
                               );
                             })()

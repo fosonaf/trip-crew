@@ -234,7 +234,12 @@ export default function EventsPage() {
                   <header className={styles.eventHeader}>
                     <h3 className={styles.eventTitle}>{event.name}</h3>
                     <div className={styles.eventHeaderBadges}>
-                      {event.role === "organizer" ? (
+                      {event.role === "admin" ? (
+                        <span className={styles.roleBadge} title="Tu es administrateur">
+                          <span className={styles.roleDot} aria-hidden="true" />
+                          Administrateur
+                        </span>
+                      ) : event.role === "organizer" ? (
                         <span className={styles.roleBadge} title="Tu es organisateur">
                           <span className={styles.roleDot} aria-hidden="true" />
                           Organisateur
@@ -281,12 +286,15 @@ export default function EventsPage() {
                     className={styles.leaveButton}
                     onClick={() => handleLeaveEvent(event)}
                     disabled={
-                      event.role === "organizer" && event.organizerCount <= 1
+                      event.role === "admin" ||
+                      (event.role === "organizer" && event.organizerCount <= 1)
                     }
                   >
-                    {event.role === "organizer" && event.organizerCount <= 1
-                      ? "Dernier organisateur"
-                      : "Quitter l’évènement"}
+                    {event.role === "admin"
+                      ? "Administrateur"
+                      : event.role === "organizer" && event.organizerCount <= 1
+                        ? "Dernier organisateur"
+                        : "Quitter l’évènement"}
                   </button>
                 </div>
               </div>
