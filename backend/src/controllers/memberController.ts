@@ -68,29 +68,140 @@ export const updateMemberRole = async (req: Request, res: Response): Promise<voi
   try {
     const { eventId, memberId } = req.params;
     const { role } = req.body as { role?: string };
+    const actingUserId = req.user?.id;
+
+    if (!actingUserId) {
+      res.status(401).json({ error: 'Not authenticated' });
+      return;
+    }
 
     if (!role || !['organizer', 'member'].includes(role)) {
       res.status(400).json({ error: 'Invalid role' });
       return;
     }
 
-    const result = await prisma.eventMember.updateMany({
-      where: {
-        id: Number(memberId),
-        eventId: Number(eventId),
-      },
-      data: { role },
+    const event = await prisma.event.findUnique({
+      where: { id: Number(eventId) },
+      select: { id: true, createdBy: true },
     });
 
-    if (result.count === 0) {
+    if (!event) {
+      res.status(404).json({ error: 'Event not found' });
+      return;
+    }
+
+    const targetMember = await prisma.eventMember.findFirst({
+      where: { id: Number(memberId), eventId: Number(eventId) },
+      select: { id: true, userId: true, role: true, status: true },
+    });
+
+    if (!targetMember) {
       res.status(404).json({ error: 'Member not found' });
       return;
     }
+
+    if (targetMember.status !== 'active') {
+      res.status(400).json({ error: 'Impossible de modifier le rôle d’un membre inactif.' });
+      return;
+    }
+
+    if (targetMember.userId === event.createdBy) {
+      res.status(400).json({ error: 'Impossible de modifier le rôle de l’administrateur.' });
+      return;
+    }
+
+    if (role === 'member' && targetMember.role === 'organizer') {
+      if (actingUserId !== event.createdBy) {
+        res.status(403).json({ error: 'Seul l’administrateur peut retirer le rôle d’organisateur.' });
+        return;
+      }
+
+      const remainingOrganizers = await prisma.eventMember.count({
+        where: {
+          eventId: Number(eventId),
+          status: 'active',
+          role: 'organizer',
+          id: { not: targetMember.id },
+        },
+      });
+
+      if (remainingOrganizers === 0) {
+        res.status(400).json({ error: 'Impossible de retirer le dernier organisateur.' });
+        return;
+      }
+    }
+
+    await prisma.eventMember.update({
+      where: { id: targetMember.id },
+      data: { role },
+    });
 
     res.json({ message: 'Member role updated successfully' });
   } catch (error) {
     console.error('Update member role error:', error);
     res.status(500).json({ error: 'Failed to update member role' });
+  }
+};
+
+export const transferEventAdmin = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { eventId } = req.params;
+    const { memberId } = req.body as { memberId?: number };
+    const userId = req.user?.id;
+
+    if (!userId) {
+      res.status(401).json({ error: 'Not authenticated' });
+      return;
+    }
+
+    if (!memberId) {
+      res.status(400).json({ error: 'memberId is required' });
+      return;
+    }
+
+    const event = await prisma.event.findUnique({
+      where: { id: Number(eventId) },
+      select: { id: true, createdBy: true },
+    });
+
+    if (!event) {
+      res.status(404).json({ error: 'Event not found' });
+      return;
+    }
+
+    if (event.createdBy !== userId) {
+      res.status(403).json({ error: 'Seul l’administrateur peut transférer la gestion de l’évènement.' });
+      return;
+    }
+
+    const targetMember = await prisma.eventMember.findFirst({
+      where: { id: Number(memberId), eventId: Number(eventId), status: 'active' },
+      select: { id: true, userId: true, role: true },
+    });
+
+    if (!targetMember) {
+      res.status(404).json({ error: 'Membre introuvable ou inactif.' });
+      return;
+    }
+
+    await prisma.$transaction(async (tx) => {
+      if (targetMember.role !== 'organizer') {
+        await tx.eventMember.update({
+          where: { id: targetMember.id },
+          data: { role: 'organizer' },
+        });
+      }
+
+      await tx.event.update({
+        where: { id: Number(eventId) },
+        data: { createdBy: targetMember.userId },
+      });
+    });
+
+    res.json({ message: 'Administrateur transféré.' });
+  } catch (error) {
+    console.error('Transfer admin error:', error);
+    res.status(500).json({ error: 'Failed to transfer admin' });
   }
 };
 
@@ -137,11 +248,28 @@ export const removeMember = async (req: Request, res: Response): Promise<void> =
         role: true,
         status: true,
         eventId: true,
+        userId: true,
       },
     });
 
     if (!membership) {
       res.status(404).json({ error: 'Member not found' });
+      return;
+    }
+
+    const actingUserId = req.user?.id;
+    if (!actingUserId) {
+      res.status(401).json({ error: 'Not authenticated' });
+      return;
+    }
+
+    const event = await prisma.event.findUnique({
+      where: { id: membership.eventId },
+      select: { createdBy: true },
+    });
+
+    if (!event) {
+      res.status(404).json({ error: 'Event not found' });
       return;
     }
 
@@ -152,6 +280,16 @@ export const removeMember = async (req: Request, res: Response): Promise<void> =
     }
 
     if (membership.role === 'organizer') {
+      if (actingUserId !== event.createdBy) {
+        res.status(403).json({ error: 'Seul l’administrateur peut retirer un organisateur.' });
+        return;
+      }
+
+      if (membership.userId === event.createdBy) {
+        res.status(400).json({ error: 'Impossible de supprimer l’administrateur via cette action.' });
+        return;
+      }
+
       const organizerCount = await prisma.eventMember.count({
         where: {
           eventId: membership.eventId,
@@ -162,6 +300,20 @@ export const removeMember = async (req: Request, res: Response): Promise<void> =
 
       if (organizerCount <= 1) {
         res.status(400).json({ error: 'Impossible de retirer le dernier organisateur.' });
+        return;
+      }
+    } else {
+      const actorMembership = await prisma.eventMember.findFirst({
+        where: {
+          eventId: membership.eventId,
+          userId: actingUserId,
+          status: 'active',
+        },
+        select: { role: true },
+      });
+
+      if (!actorMembership || actorMembership.role !== 'organizer') {
+        res.status(403).json({ error: 'Seuls les organisateurs peuvent retirer un membre.' });
         return;
       }
     }
@@ -766,6 +918,24 @@ export const leaveEvent = async (req: Request, res: Response): Promise<void> => 
 
     if (!membership) {
       res.status(404).json({ error: 'Membership not found' });
+      return;
+    }
+
+    const event = await prisma.event.findUnique({
+      where: { id: membership.eventId },
+      select: { createdBy: true },
+    });
+
+    if (!event) {
+      res.status(404).json({ error: 'Event not found' });
+      return;
+    }
+
+    if (event.createdBy === userId) {
+      res.status(400).json({
+        error:
+          'Impossible de quitter : tu es l’administrateur. Transfère l’administration avant de quitter.',
+      });
       return;
     }
 

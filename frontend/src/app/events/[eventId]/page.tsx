@@ -141,6 +141,7 @@ export default function EventDetailPage() {
   }, [event]);
 
   const isOrganizer = currentMember?.role === "organizer";
+  const isAdmin = event && user ? event.createdBy.id === user.id : false;
 
   const pendingJoinRequests = useMemo(() => {
     if (!event) return 0;
@@ -901,21 +902,35 @@ export default function EventDetailPage() {
                         {isOrganizer && member.status === "pending" ? (
                           <button
                             type="button"
-                            className={styles.memberRemoveButton}
+                            className={styles.memberRemoveIcon}
+                            aria-label="Supprimer l’invitation"
                             onClick={() => handleRemoveInvitation(member.id)}
                           >
-                            Supprimer l’invitation
+                            ✕
                           </button>
                         ) : null}
-                        {isOrganizer && member.status === "active" && member.userId !== user?.id ? (
-                          <button
-                            type="button"
-                            className={styles.memberRemoveButton}
-                            onClick={() => handleRemoveMember(member.id)}
-                          >
-                            Retirer du groupe
-                          </button>
-                        ) : null}
+                        {member.status === "active" && member.userId !== user?.id
+                          ? (() => {
+                              if (member.role === "organizer") {
+                                if (!isAdmin) {
+                                  return null;
+                                }
+                              } else if (!isOrganizer && !isAdmin) {
+                                return null;
+                              }
+
+                              return (
+                                <button
+                                  type="button"
+                                  className={styles.memberRemoveIcon}
+                                  aria-label="Retirer ce membre"
+                                  onClick={() => handleRemoveMember(member.id)}
+                                >
+                                  ✕
+                                </button>
+                              );
+                            })()
+                          : null}
                       </div>
                     </div>
                   </div>

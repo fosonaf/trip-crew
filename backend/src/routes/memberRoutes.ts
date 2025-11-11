@@ -17,6 +17,7 @@ import {
   listEventJoinRequests,
   acceptJoinRequest,
   declineJoinRequest,
+  transferEventAdmin,
 } from '../controllers/memberController';
 import { authenticate, isEventOrganizer } from '../middleware/auth';
 
@@ -32,6 +33,7 @@ router.get('/:eventId/requests', authenticate, isEventOrganizer, listEventJoinRe
 router.post('/:eventId/requests', authenticate, requestEventJoin);
 router.post('/:eventId/requests/:requestId/accept', authenticate, isEventOrganizer, acceptJoinRequest);
 router.post('/:eventId/requests/:requestId/decline', authenticate, isEventOrganizer, declineJoinRequest);
+router.post('/:eventId/admin/transfer', authenticate, transferEventAdmin);
 router.post('/:eventId/join', authenticate, joinEvent);
 router.delete('/:eventId/leave', authenticate, leaveEvent);
 router.get('/:eventId/qrcode', authenticate, getMemberQRCode);

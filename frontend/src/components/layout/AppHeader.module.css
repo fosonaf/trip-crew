@@ -190,12 +190,16 @@
 }
 
 .requestCancelButton {
-  padding: 6px 12px;
-  border-radius: 999px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
   border: 1px solid rgba(248, 113, 113, 0.45);
   background-color: rgba(248, 113, 113, 0.2);
   color: rgba(248, 113, 113, 1);
-  font-weight: 600;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
   transition: transform 150ms ease, box-shadow 150ms ease, opacity 120ms ease;
 }

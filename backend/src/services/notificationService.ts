@@ -13,7 +13,7 @@ export const startNotificationScheduler = (io: Server): void => {
   cron.schedule('* * * * *', async () => {
     try {
       const now = new Date();
-
+      
       const steps = await prisma.eventStep.findMany({
         where: {
           scheduledTime: { gt: now },
@@ -66,13 +66,13 @@ export const startNotificationScheduler = (io: Server): void => {
             },
           });
 
-          if (io) {
+            if (io) {
             io.to(`user_${member.userId}`).emit('notification', {
-              title: `Upcoming: ${step.name}`,
-              message: `${step.name} is coming up soon!`,
+                title: `Upcoming: ${step.name}`,
+                message: `${step.name} is coming up soon!`,
               eventId: step.eventId,
-              stepId: step.id,
-            });
+                stepId: step.id,
+              });
           }
         }
       }

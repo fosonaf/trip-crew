@@ -285,10 +285,11 @@ if (shouldHide) {
                         <button
                           type="button"
                           className={styles.requestCancelButton}
+                          aria-label="Annuler la demande"
                           onClick={() => handleCancelJoinRequest(request.id)}
                           disabled={activeRequestAction === request.id}
                         >
-                          {activeRequestAction === request.id ? "Annulation…" : "Annuler"}
+                          {activeRequestAction === request.id ? "…" : "✕"}
                         </button>
                       </div>
                     </li>
