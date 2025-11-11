@@ -10,7 +10,7 @@ const parseDateTime = (value: string): Date | null => {
 export const createStep = async (req: Request, res: Response): Promise<void> => {
   try {
     const { eventId } = req.params;
-    const { name, description, location, scheduledTime, alertBeforeMinutes } = req.body;
+    const { name, description, location, scheduledTime } = req.body;
 
     const event = await prisma.event.findUnique({
       where: { id: Number(eventId) },
@@ -47,10 +47,7 @@ export const createStep = async (req: Request, res: Response): Promise<void> => 
         description: description ?? null,
         location: location ?? null,
         scheduledTime: scheduledDate,
-        alertBeforeMinutes:
-          alertBeforeMinutes === undefined || alertBeforeMinutes === null
-            ? 30
-            : Number(alertBeforeMinutes),
+        alertBeforeMinutes: 30,
       },
       select: {
         id: true,
@@ -58,7 +55,6 @@ export const createStep = async (req: Request, res: Response): Promise<void> => 
         description: true,
         location: true,
         scheduledTime: true,
-        alertBeforeMinutes: true,
       },
     });
 
@@ -68,7 +64,6 @@ export const createStep = async (req: Request, res: Response): Promise<void> => 
       description: step.description,
       location: step.location,
       scheduledTime: step.scheduledTime,
-      alertBeforeMinutes: step.alertBeforeMinutes,
     });
   } catch (error) {
     console.error('Create step error:', error);
@@ -89,7 +84,6 @@ export const getSteps = async (req: Request, res: Response): Promise<void> => {
         description: true,
         location: true,
         scheduledTime: true,
-        alertBeforeMinutes: true,
       },
     });
 
@@ -102,7 +96,6 @@ export const getSteps = async (req: Request, res: Response): Promise<void> => {
         description: step.description,
         location: step.location,
         scheduledTime: step.scheduledTime,
-        alertBeforeMinutes: step.alertBeforeMinutes,
       })),
     );
   } catch (error) {
@@ -114,7 +107,7 @@ export const getSteps = async (req: Request, res: Response): Promise<void> => {
 export const updateStep = async (req: Request, res: Response): Promise<void> => {
   try {
     const { eventId, stepId } = req.params;
-    const { name, description, location, scheduledTime, alertBeforeMinutes } = req.body;
+    const { name, description, location, scheduledTime } = req.body;
 
     const event = await prisma.event.findUnique({
       where: { id: Number(eventId) },
@@ -151,10 +144,7 @@ export const updateStep = async (req: Request, res: Response): Promise<void> => 
         description: description ?? null,
         location: location ?? null,
         scheduledTime: scheduledDate,
-        alertBeforeMinutes:
-          alertBeforeMinutes === undefined || alertBeforeMinutes === null
-            ? null
-            : Number(alertBeforeMinutes),
+        alertBeforeMinutes: 30,
       },
     });
 

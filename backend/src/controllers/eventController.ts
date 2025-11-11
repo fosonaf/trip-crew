@@ -302,7 +302,6 @@ export const getEventById = async (req: Request, res: Response): Promise<void> =
       description: step.description,
       location: step.location,
       scheduledTime: step.scheduledTime,
-      alertBeforeMinutes: step.alertBeforeMinutes,
     }));
 
     res.json({

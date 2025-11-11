@@ -2,11 +2,10 @@ import cron from 'node-cron';
 import { Server } from 'socket.io';
 import prisma from '../config/prisma';
 
-const getAlertThreshold = (minutes: number | null | undefined, reference: Date): Date | null => {
-  if (minutes === null || minutes === undefined || minutes <= 0) {
-    return null;
-  }
-  return new Date(reference.getTime() + minutes * 60 * 1000);
+const ALERT_BEFORE_MINUTES = 30;
+
+const getAlertThreshold = (reference: Date): Date => {
+  return new Date(reference.getTime() + ALERT_BEFORE_MINUTES * 60 * 1000);
 };
 
 export const startNotificationScheduler = (io: Server): void => {
@@ -29,10 +28,7 @@ export const startNotificationScheduler = (io: Server): void => {
       });
 
       for (const step of steps) {
-        const threshold = getAlertThreshold(step.alertBeforeMinutes, now);
-        if (!threshold) {
-          continue;
-        }
+        const threshold = getAlertThreshold(now);
 
         if (step.scheduledTime > threshold) {
           continue;

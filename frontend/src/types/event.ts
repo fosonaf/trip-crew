@@ -74,7 +74,6 @@ export type EventStep = {
   description: string | null;
   location: string | null;
   scheduledTime: string;
-  alertBeforeMinutes: number | null;
 };
 
 export type CreateStepPayload = {
@@ -82,7 +81,6 @@ export type CreateStepPayload = {
   description?: string | null;
   location?: string | null;
   scheduledTime: string;
-  alertBeforeMinutes?: number | null;
 };
 
 export type EventDetail = {

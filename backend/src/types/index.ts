@@ -43,7 +43,6 @@ export interface EventStep {
   description?: string;
   location?: string;
   scheduledTime: Date;
-  alertBeforeMinutes: number;
   createdAt: Date;
   updatedAt: Date;
 }

@@ -91,7 +91,6 @@ export default function EventDetailPage() {
     description: "",
     location: "",
     scheduledTime: "",
-    alertBeforeMinutes: "30",
   });
   const [eventForm, setEventForm] = useState({
     name: "",
@@ -279,7 +278,6 @@ export default function EventDetailPage() {
       description: "",
       location: "",
       scheduledTime: "",
-      alertBeforeMinutes: "30",
     });
     setStepError(null);
     setEditingStep(null);
@@ -385,9 +383,6 @@ export default function EventDetailPage() {
       description: stepForm.description.trim() || null,
       location: stepForm.location.trim() || null,
       scheduledTime: new Date(stepForm.scheduledTime).toISOString(),
-      alertBeforeMinutes: stepForm.alertBeforeMinutes
-        ? Number(stepForm.alertBeforeMinutes)
-        : null,
     };
 
     setIsSubmittingStep(true);
@@ -548,10 +543,6 @@ export default function EventDetailPage() {
       description: step.description ?? "",
       location: step.location ?? "",
       scheduledTime: toDateTimeLocalValue(step.scheduledTime),
-      alertBeforeMinutes:
-        step.alertBeforeMinutes !== null && step.alertBeforeMinutes !== undefined
-          ? String(step.alertBeforeMinutes)
-          : "",
     });
     setStepError(null);
     setIsStepModalOpen(true);
@@ -1090,12 +1081,6 @@ export default function EventDetailPage() {
                       <div className={styles.stepMeta}>
                         <span>📍 {step.location || "Lieu à définir"}</span>
                         <span>🕒 {formatDateTime(step.scheduledTime)}</span>
-                        {step.alertBeforeMinutes ? (
-                          <span>
-                            ⏰ Rappel {step.alertBeforeMinutes} minute
-                            {step.alertBeforeMinutes > 1 ? "s" : ""} avant
-                          </span>
-                        ) : null}
                       </div>
                     </div>
                   ))}
@@ -1176,22 +1161,6 @@ export default function EventDetailPage() {
                     className={styles.input}
                     placeholder="Adresse ou point de rendez-vous"
                     value={stepForm.location}
-                    onChange={handleStepFieldChange}
-                  />
-                </div>
-              </div>
-              <div className={`${styles.stepFormRow} ${styles.stepFormRowTwoCols}`}>
-                <div className={styles.field}>
-                  <label htmlFor="step-alertBeforeMinutes" className={styles.label}>
-                    Rappel (minutes avant)
-                  </label>
-                  <input
-                    id="step-alertBeforeMinutes"
-                    name="alertBeforeMinutes"
-                    type="number"
-                    min="0"
-                    className={styles.input}
-                    value={stepForm.alertBeforeMinutes}
                     onChange={handleStepFieldChange}
                   />
                 </div>
