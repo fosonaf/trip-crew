@@ -44,3 +44,64 @@ export type PendingInvitation = {
   inviter: string | null;
 };
 
+export type EventMember = {
+  id: number;
+  userId: number;
+  firstName: string;
+  lastName: string;
+  email: string | null;
+  phone: string | null;
+  avatarUrl: string | null;
+  role: "member" | "organizer" | "admin";
+  showPhone: boolean;
+  paymentStatus: string | null;
+  status: "pending" | "active";
+  invitedBy: number | null;
+};
+
+export type EventJoinRequest = {
+  id: number;
+  userId: number;
+  firstName: string;
+  lastName: string;
+  email: string | null;
+  phone: string | null;
+  avatarUrl: string | null;
+  requestedAt: string;
+};
+
+export type EventStep = {
+  id: number;
+  name: string;
+  description: string | null;
+  location: string | null;
+  scheduledTime: string;
+};
+
+export type CreateStepPayload = {
+  name: string;
+  description?: string | null;
+  location?: string | null;
+  scheduledTime: string;
+};
+
+export type EventDetail = {
+  id: number;
+  name: string;
+  description: string;
+  startDate: string;
+  endDate: string;
+  location: string;
+  isPaid: boolean;
+  price: number | null;
+  createdBy: {
+    id: number;
+    firstName: string;
+    lastName: string;
+  };
+  members: EventMember[];
+  steps: EventStep[];
+  joinRequests: EventJoinRequest[];
+  joinRequestCount: number;
+};
+

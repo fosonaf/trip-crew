@@ -443,7 +443,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#0C1B33",
   },
   scrollContent: {
-    padding: 24,
+    paddingHorizontal: 24,
+    paddingTop: 24,
+    paddingBottom: 48,
     gap: 24,
   },
   heroCard: {
