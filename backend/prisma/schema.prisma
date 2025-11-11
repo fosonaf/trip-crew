@@ -61,6 +61,7 @@ model EventMember {
   qrCode         String?    @map("qr_code")
   joinedAt       DateTime   @default(now()) @map("joined_at")
   updatedAt      DateTime?  @map("updated_at")
+  showPhone      Boolean    @map("show_phone") @default(true)
   event          Event      @relation(fields: [eventId], references: [id], onDelete: Cascade)
   user           User       @relation("MemberUser", fields: [userId], references: [id], onDelete: Cascade)
   inviter        User?      @relation("MemberInvitedBy", fields: [invitedBy], references: [id])

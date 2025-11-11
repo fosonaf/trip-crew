@@ -283,19 +283,33 @@ export const getEventById = async (req: Request, res: Response): Promise<void> =
     }
 
     type EventMemberWithUser = (typeof event.members)[number];
-    const members = event.members.map((member: EventMemberWithUser) => ({
-      id: member.id,
-      userId: member.user.id,
-      firstName: member.user.firstName,
-      lastName: member.user.lastName,
-      email: member.user.email,
-      phone: member.user.phone,
-      role: member.user.id === event.createdBy ? 'admin' : member.role,
-      paymentStatus: member.paymentStatus,
-      status: member.status,
-      invitedBy: member.invitedBy,
-      avatarUrl: member.user.avatarUrl,
-    }));
+    const viewerId = req.user?.id ?? null;
+
+    const isViewerOrganizer =
+      membership.role === 'organizer' || membership.role === 'admin';
+
+    const members = event.members.map((member: EventMemberWithUser) => {
+      const isAdminForMember = member.user.id === event.createdBy;
+      const isSelf = member.user.id === viewerId;
+      const isOrganizerForMember = member.role === 'organizer' || isAdminForMember;
+      const phoneVisible =
+        isSelf || isViewerOrganizer || isOrganizerForMember || member.showPhone;
+
+      return {
+        id: member.id,
+        userId: member.user.id,
+        firstName: member.user.firstName,
+        lastName: member.user.lastName,
+        email: member.user.email,
+        phone: phoneVisible ? member.user.phone : null,
+        showPhone: member.showPhone,
+        role: isAdminForMember ? 'admin' : member.role,
+        paymentStatus: member.paymentStatus,
+        status: member.status,
+        invitedBy: member.invitedBy,
+        avatarUrl: member.user.avatarUrl,
+      };
+    });
 
     type EventStepData = (typeof event.steps)[number];
     const steps = event.steps.map((step: EventStepData) => ({

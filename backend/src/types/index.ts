@@ -34,6 +34,7 @@ export interface EventMember {
   invitedBy?: number | null;
   qrCode?: string;
   joinedAt: Date;
+  showPhone: boolean;
 }
 
 export interface EventStep {

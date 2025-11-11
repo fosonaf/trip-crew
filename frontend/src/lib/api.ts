@@ -146,6 +146,14 @@ export const eventApi = {
       method: "PUT",
       body: JSON.stringify(payload),
     }),
+  updateMemberPreferences: (eventId: string, payload: { showPhone: boolean }) =>
+    apiFetch<{ message: string; showPhone: boolean }>(
+      `/api/events/${eventId}/members/self/preferences`,
+      {
+        method: "PATCH",
+        body: JSON.stringify(payload),
+      },
+    ),
   invite: (eventId: string, payload: { phone: string }) =>
     apiFetch<{ memberId: number; message: string }>(`/api/events/${eventId}/invitations`, {
       method: "POST",

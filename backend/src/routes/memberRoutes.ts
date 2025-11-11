@@ -18,6 +18,7 @@ import {
   acceptJoinRequest,
   declineJoinRequest,
   transferEventAdmin,
+  updateMemberPreferences,
 } from '../controllers/memberController';
 import { authenticate, isEventOrganizer } from '../middleware/auth';
 
@@ -41,5 +42,6 @@ router.put('/:eventId/members/:memberId/role', authenticate, isEventOrganizer, u
 router.put('/:eventId/members/:memberId/payment', authenticate, isEventOrganizer, updatePaymentStatus);
 router.delete('/:eventId/members/:memberId', authenticate, isEventOrganizer, removeMember);
 router.delete('/:eventId/invitations/:memberId', authenticate, isEventOrganizer, removePendingInvitation);
+router.patch('/:eventId/members/self/preferences', authenticate, updateMemberPreferences);
 
 export default router;

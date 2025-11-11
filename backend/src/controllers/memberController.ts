@@ -341,6 +341,44 @@ export const removeMember = async (req: Request, res: Response): Promise<void> =
   }
 };
 
+export const updateMemberPreferences = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { eventId } = req.params;
+    const userId = req.user?.id;
+    const { showPhone } = req.body as { showPhone?: boolean };
+
+    if (!userId) {
+      res.status(401).json({ error: 'Not authenticated' });
+      return;
+    }
+
+    if (typeof showPhone !== 'boolean') {
+      res.status(400).json({ error: 'showPhone must be a boolean' });
+      return;
+    }
+
+    const membership = await prisma.eventMember.findFirst({
+      where: { eventId: Number(eventId), userId, status: 'active' },
+      select: { id: true },
+    });
+
+    if (!membership) {
+      res.status(404).json({ error: 'Membership not found' });
+      return;
+    }
+
+    await prisma.eventMember.update({
+      where: { id: membership.id },
+      data: { showPhone },
+    });
+
+    res.json({ message: 'Preferences updated', showPhone });
+  } catch (error) {
+    console.error('Update member preferences error:', error);
+    res.status(500).json({ error: 'Failed to update preferences' });
+  }
+};
+
 export const getMemberQRCode = async (req: Request, res: Response): Promise<void> => {
   try {
     const { eventId } = req.params;

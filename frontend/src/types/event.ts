@@ -45,6 +45,7 @@ export type EventMember = {
   phone: string | null;
   avatarUrl: string | null;
   role: string;
+  showPhone: boolean;
   paymentStatus: string | null;
   status: "pending" | "active";
   invitedBy: number | null;

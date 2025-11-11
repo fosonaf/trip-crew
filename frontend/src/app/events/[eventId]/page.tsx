@@ -81,6 +81,7 @@ export default function EventDetailPage() {
   const [invitePhone, setInvitePhone] = useState("");
   const [isLeaving, setIsLeaving] = useState(false);
   const [isUpdatingEvent, setIsUpdatingEvent] = useState(false);
+  const [isUpdatingPhoneVisibility, setIsUpdatingPhoneVisibility] = useState(false);
   const [eventFormError, setEventFormError] = useState<string | null>(null);
   const [updatingMemberRoleId, setUpdatingMemberRoleId] = useState<number | null>(null);
   const [isEventUpdateConfirmationOpen, setIsEventUpdateConfirmationOpen] = useState(false);
@@ -572,6 +573,41 @@ export default function EventDetailPage() {
             ? err.message
             : "Impossible de supprimer cette invitation pour le moment.";
       setToast({ message, variant: "error" });
+    }
+  };
+
+  const handleTogglePhoneVisibility = async () => {
+    if (!eventId || !currentMember) return;
+    const nextShowPhone = !currentMember.showPhone;
+    setIsUpdatingPhoneVisibility(true);
+    try {
+      await eventApi.updateMemberPreferences(eventId, { showPhone: nextShowPhone });
+      setEvent((prev) =>
+        prev
+          ? {
+              ...prev,
+              members: prev.members.map((member) =>
+                member.id === currentMember.id ? { ...member, showPhone: nextShowPhone } : member,
+              ),
+            }
+          : prev,
+      );
+      setToast({
+        message: nextShowPhone
+          ? "Ton numéro est désormais visible par les membres."
+          : "Ton numéro est désormais masqué.",
+        variant: "success",
+      });
+    } catch (err) {
+      const message =
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : "Impossible de mettre à jour la visibilité pour le moment.";
+      setToast({ message, variant: "error" });
+    } finally {
+      setIsUpdatingPhoneVisibility(false);
     }
   };
 
@@ -1072,6 +1108,33 @@ export default function EventDetailPage() {
                   <dd>{adminName || "Inconnu"}</dd>
                 </div>
               </dl>
+
+              {currentMember ? (
+                <div className={styles.preferenceCard}>
+                  <div className={styles.preferenceText}>
+                    <h2 className={styles.preferenceTitle}>Visibilité du numéro</h2>
+                    <p className={styles.preferenceDescription}>
+                      {currentMember.showPhone
+                        ? "Ton numéro est visible par les autres membres de l’évènement."
+                        : "Ton numéro est actuellement masqué pour les autres membres."}
+                    </p>
+                  </div>
+                  <label className={styles.toggleSwitch}>
+                    <input
+                      type="checkbox"
+                      checked={currentMember.showPhone}
+                      onChange={handleTogglePhoneVisibility}
+                      disabled={isUpdatingPhoneVisibility}
+                      aria-label="Afficher mon numéro de téléphone aux membres"
+                    />
+                    <span className={styles.toggleSlider} />
+                  </label>
+                </div>
+              ) : null}
+
+              {isUpdatingPhoneVisibility ? (
+                <p className={styles.preferenceHint}>Mise à jour de la visibilité…</p>
+              ) : null}
             </>
           ) : null}
         </section>
@@ -1461,9 +1524,12 @@ export default function EventDetailPage() {
                         <p className={styles.memberContact}>
                           Contact :{" "}
                           {(() => {
-                            const parts = [member.phone, member.email].filter(
-                              (value): value is string => Boolean(value),
-                            );
+                            const parts = [
+                              member.phone && (member.showPhone || member.userId === user?.id)
+                                ? member.phone
+                                : null,
+                              member.email,
+                            ].filter((value): value is string => Boolean(value));
                             return parts.length > 0 ? parts.join(" • ") : "Non renseigné";
                           })()}
                         </p>
