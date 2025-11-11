@@ -1,18 +1,25 @@
-import { Link } from "expo-router";
+import { Link, Stack } from "expo-router";
 import { StyleSheet, Text, View } from "react-native";
 
 export default function AppHomeScreen() {
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Bienvenue sur Trip Crew Mobile 🚀</Text>
-      <Text style={styles.subtitle}>
-        L’application mobile partage les mêmes fonctionnalités que le web, tout en ajoutant les
-        scénarios terrain (invitation SMS/WhatsApp, contrôle de présence, scan QR code).
-      </Text>
-      <Link href="/(app)/events" style={styles.link}>
-        Voir les événements
-      </Link>
-    </View>
+    <>
+      <Stack.Screen
+        options={{
+          title: "Accueil",
+        }}
+      />
+      <View style={styles.container}>
+        <Text style={styles.title}>Bienvenue sur Trip Crew 🚀</Text>
+        <Text style={styles.subtitle}>
+          L’application mobile partage les mêmes fonctionnalités que le web, tout en ajoutant les
+          scénarios terrain (invitation SMS/WhatsApp, contrôle de présence, scan QR code).
+        </Text>
+        <Link href="/(app)/events" style={styles.link}>
+          Voir les événements
+        </Link>
+      </View>
+    </>
   );
 }
 

@@ -1,7 +1,7 @@
 import { Redirect, Stack } from "expo-router";
 import { useAuth } from "@/hooks/use-auth";
 import { FullscreenLoader } from "@/components/ui/fullscreen-loader";
-import { LogoutButton } from "@/components/logout-button";
+import { HeaderActions } from "@/components/header-actions";
 
 export default function AppLayout() {
   const { status } = useAuth();
@@ -22,7 +22,7 @@ export default function AppLayout() {
         headerTitleStyle: { fontWeight: "700" },
         contentStyle: { backgroundColor: "#0C1B33" },
         animation: "fade",
-        headerRight: () => <LogoutButton />,
+        headerRight: () => <HeaderActions />,
       }}
     />
   );

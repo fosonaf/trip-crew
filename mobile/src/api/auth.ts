@@ -13,5 +13,15 @@ export const authApi = {
   profile() {
     return apiClient.get<{ user: User }>("/auth/profile").then((res) => res.data);
   },
+  updateProfile(payload: {
+    email?: string;
+    phone?: string;
+    avatarUrl?: string | null;
+    currentPassword?: string;
+    newPassword?: string;
+    confirmPassword?: string;
+  }) {
+    return apiClient.put<{ user: User }>("/auth/profile", payload).then((res) => res.data);
+  },
 };
 
