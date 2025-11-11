@@ -12,13 +12,31 @@ export const createStep = async (req: Request, res: Response): Promise<void> => 
     const { eventId } = req.params;
     const { name, description, location, scheduledTime, alertBeforeMinutes } = req.body;
 
-    const eventExists = await prisma.event.findUnique({
+    const event = await prisma.event.findUnique({
       where: { id: Number(eventId) },
-      select: { id: true },
+      select: { id: true, startDate: true, endDate: true },
     });
 
-    if (!eventExists) {
+    if (!event) {
       res.status(404).json({ error: 'Event not found' });
+      return;
+    }
+
+    const scheduledDate = parseDateTime(scheduledTime);
+
+    if (!scheduledDate) {
+      res.status(400).json({ error: 'Invalid step scheduled time' });
+      return;
+    }
+
+    const eventStart = event.startDate;
+    const eventEnd = event.endDate;
+
+    if (
+      (eventStart && scheduledDate < eventStart) ||
+      (eventEnd && scheduledDate > eventEnd)
+    ) {
+      res.status(400).json({ error: 'Step must be scheduled within the event timeframe' });
       return;
     }
 
@@ -28,7 +46,7 @@ export const createStep = async (req: Request, res: Response): Promise<void> => 
         name,
         description: description ?? null,
         location: location ?? null,
-        scheduledTime: parseDateTime(scheduledTime) ?? new Date(),
+        scheduledTime: scheduledDate,
         alertBeforeMinutes:
           alertBeforeMinutes === undefined || alertBeforeMinutes === null
             ? 30
@@ -98,13 +116,41 @@ export const updateStep = async (req: Request, res: Response): Promise<void> => 
     const { eventId, stepId } = req.params;
     const { name, description, location, scheduledTime, alertBeforeMinutes } = req.body;
 
+    const event = await prisma.event.findUnique({
+      where: { id: Number(eventId) },
+      select: { id: true, startDate: true, endDate: true },
+    });
+
+    if (!event) {
+      res.status(404).json({ error: 'Event not found' });
+      return;
+    }
+
+    const scheduledDate = parseDateTime(scheduledTime);
+
+    if (!scheduledDate) {
+      res.status(400).json({ error: 'Invalid step scheduled time' });
+      return;
+    }
+
+    const eventStart = event.startDate;
+    const eventEnd = event.endDate;
+
+    if (
+      (eventStart && scheduledDate < eventStart) ||
+      (eventEnd && scheduledDate > eventEnd)
+    ) {
+      res.status(400).json({ error: 'Step must be scheduled within the event timeframe' });
+      return;
+    }
+
     const result = await prisma.eventStep.updateMany({
       where: { id: Number(stepId), eventId: Number(eventId) },
       data: {
         name,
         description: description ?? null,
         location: location ?? null,
-        scheduledTime: parseDateTime(scheduledTime) ?? new Date(),
+        scheduledTime: scheduledDate,
         alertBeforeMinutes:
           alertBeforeMinutes === undefined || alertBeforeMinutes === null
             ? null

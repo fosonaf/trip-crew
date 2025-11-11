@@ -323,6 +323,23 @@ export default function EventDetailPage() {
       return;
     }
 
+    const stepDate = new Date(stepForm.scheduledTime);
+    if (Number.isNaN(stepDate.getTime())) {
+      setStepError("La date et l’heure de l’étape sont invalides.");
+      return;
+    }
+
+    const eventStartDate = event.startDate ? new Date(event.startDate) : null;
+    const eventEndDate = event.endDate ? new Date(event.endDate) : null;
+
+    if (
+      (eventStartDate && stepDate < eventStartDate) ||
+      (eventEndDate && stepDate > eventEndDate)
+    ) {
+      setStepError("L’étape doit se situer dans le créneau de l’évènement.");
+      return;
+    }
+
     const payload: CreateStepPayload = {
       name: stepForm.name.trim(),
       description: stepForm.description.trim() || null,
@@ -699,8 +716,8 @@ export default function EventDetailPage() {
 
     const payload = {
       name: eventForm.name.trim(),
-      description: eventForm.description.trim() || null,
-      location: eventForm.location.trim() || null,
+      description: eventForm.description.trim(),
+      location: eventForm.location.trim(),
       startDate: new Date(eventForm.startDate).toISOString(),
       endDate: new Date(eventForm.endDate).toISOString(),
       isPaid: eventForm.isPaid,
