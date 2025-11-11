@@ -12,6 +12,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import DateTimePickerModal from "react-native-modal-datetime-picker";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
 import { useAuth } from "@/hooks/use-auth";
@@ -102,6 +103,8 @@ export default function EventDetailScreen() {
     location: "",
     scheduledTime: "",
   });
+  const [stepDate, setStepDate] = useState<Date | null>(null);
+  const [isDateTimePickerVisible, setIsDateTimePickerVisible] = useState(false);
   const [eventForm, setEventForm] = useState<EventFormState>({
     name: "",
     description: "",
@@ -342,16 +345,12 @@ export default function EventDetailScreen() {
   });
 
   const createOrUpdateStepMutation = useMutation({
-    mutationFn: async (payload: { form: StepFormState; editingStepId?: number }) => {
-      const iso = parseDateTimeInput(payload.form.scheduledTime);
-      if (!iso) {
-        throw new Error("Merci d’indiquer une date et une heure valides.");
-      }
+    mutationFn: async (payload: { form: StepFormState; iso: string; editingStepId?: number }) => {
       const body: CreateStepPayload = {
         name: payload.form.name.trim(),
         description: payload.form.description.trim() || null,
         location: payload.form.location.trim() || null,
-        scheduledTime: iso,
+        scheduledTime: payload.iso,
       };
 
       if (payload.editingStepId) {
@@ -364,15 +363,7 @@ export default function EventDetailScreen() {
     onSuccess: async (data) => {
       await invalidateEvent();
       showToast(data.message, "success");
-      setStepForm({
-        name: "",
-        description: "",
-        location: "",
-        scheduledTime: "",
-      });
-      setEditingStep(null);
-      setIsStepModalVisible(false);
-      setStepError(null);
+      closeStepModal();
     },
     onError: (err: unknown) => {
       let message = "Impossible d’enregistrer l’étape pour le moment.";
@@ -502,15 +493,18 @@ export default function EventDetailScreen() {
 
   const handleOpenStepModal = (step?: EventStep) => {
     if (step) {
+      const existingDate = new Date(step.scheduledTime);
       setEditingStep(step);
+      setStepDate(Number.isNaN(existingDate.valueOf()) ? null : existingDate);
       setStepForm({
         name: step.name,
         description: step.description ?? "",
         location: step.location ?? "",
-        scheduledTime: toInputDateTime(step.scheduledTime),
+        scheduledTime: Number.isNaN(existingDate.valueOf()) ? "" : existingDate.toISOString(),
       });
     } else {
       setEditingStep(null);
+      setStepDate(null);
       setStepForm({
         name: "",
         description: "",
@@ -544,15 +538,37 @@ export default function EventDetailScreen() {
     setIsEditEventModalVisible(true);
   };
 
+  const handleStepDateConfirm = (date: Date) => {
+    setIsDateTimePickerVisible(false);
+    setStepDate(date);
+    setStepForm((prev) => ({ ...prev, scheduledTime: date.toISOString() }));
+    setStepError(null);
+  };
+
+  const handleStepDateCancel = () => {
+    setIsDateTimePickerVisible(false);
+  };
+
+  const closeStepModal = () => {
+    setIsStepModalVisible(false);
+    setIsDateTimePickerVisible(false);
+    setStepError(null);
+    setStepDate(null);
+    setEditingStep(null);
+    setStepForm({
+      name: "",
+      description: "",
+      location: "",
+      scheduledTime: "",
+    });
+  };
+
   const validateStepForm = () => {
     if (!stepForm.name.trim()) {
       return "Le nom de l’étape est obligatoire.";
     }
-    if (!stepForm.scheduledTime.trim()) {
-      return "Merci d’indiquer la date et l’heure.";
-    }
-    if (!parseDateTimeInput(stepForm.scheduledTime)) {
-      return "La date renseignée n’est pas valide.";
+    if (!stepDate) {
+      return "Merci de choisir la date et l’heure.";
     }
     return null;
   };
@@ -563,8 +579,38 @@ export default function EventDetailScreen() {
       setStepError(validationError);
       return;
     }
+
+    if (!stepDate) {
+      setStepError("Merci de choisir la date et l’heure.");
+      return;
+    }
+
+    const iso = stepDate.toISOString();
+
+    if (event) {
+      const stepDateValue = new Date(iso);
+      const eventStart = event.startDate ? new Date(event.startDate) : null;
+      const eventEnd = event.endDate ? new Date(event.endDate) : null;
+
+      if (eventStart && stepDateValue < eventStart) {
+        setStepError("L’étape doit se situer après la date de début de l’évènement.");
+        return;
+      }
+      if (eventEnd && stepDateValue > eventEnd) {
+        setStepError("L’étape doit se situer avant la date de fin de l’évènement.");
+        return;
+      }
+    }
+
+    const updatedForm = {
+      ...stepForm,
+      scheduledTime: iso,
+    };
+    setStepForm(updatedForm);
+
     createOrUpdateStepMutation.mutate({
-      form: stepForm,
+      form: updatedForm,
+      iso,
       editingStepId: editingStep?.id,
     });
   };
@@ -871,6 +917,12 @@ export default function EventDetailScreen() {
     return adminMember.phone;
   }, [event]);
 
+  const stepDateLabel = stepDate ? formatDateTime(stepDate.toISOString()) : "Sélectionner la date et l’heure";
+  const isStepSubmitDisabled =
+    !stepForm.name.trim() ||
+    !stepDate ||
+    createOrUpdateStepMutation.isPending;
+
   if (!eventId) {
     return (
       <View style={styles.loadingContainer}>
@@ -1154,15 +1206,15 @@ export default function EventDetailScreen() {
         visible={isStepModalVisible}
         animationType="slide"
         transparent
-        onRequestClose={() => setIsStepModalVisible(false)}
+        onRequestClose={closeStepModal}
       >
-        <Pressable style={styles.modalOverlay} onPress={() => setIsStepModalVisible(false)}>
+        <Pressable style={styles.modalOverlay} onPress={closeStepModal}>
           <Pressable style={styles.modalContent} onPress={(evt) => evt.stopPropagation()}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
                 {editingStep ? "Modifier l’étape" : "Nouvelle étape"}
               </Text>
-              <Pressable onPress={() => setIsStepModalVisible(false)}>
+              <Pressable onPress={closeStepModal}>
                 <Text style={styles.closeButton}>Fermer</Text>
               </Pressable>
             </View>
@@ -1201,33 +1253,46 @@ export default function EventDetailScreen() {
                 />
               </View>
               <View style={styles.formGroup}>
-                <Text style={styles.label}>Date et heure (YYYY-MM-DD HH:mm)</Text>
-                <TextInput
-                  value={stepForm.scheduledTime}
-                  onChangeText={(value) =>
-                    setStepForm((prev) => ({ ...prev, scheduledTime: value }))
-                  }
-                  placeholder="2025-01-12T13:30"
-                  placeholderTextColor="rgba(255,255,255,0.4)"
-                  style={styles.input}
-                />
+                <Text style={styles.label}>Date et heure</Text>
+                <Pressable
+                  style={[styles.input, styles.dateInput]}
+                  onPress={() => setIsDateTimePickerVisible(true)}
+                >
+                  <Text
+                    style={stepDate ? styles.dateInputLabel : styles.dateInputPlaceholder}
+                  >
+                    {stepDateLabel}
+                  </Text>
+                </Pressable>
               </View>
               {stepError ? <Text style={styles.errorText}>{stepError}</Text> : null}
             </ScrollView>
+            <DateTimePickerModal
+              isVisible={isDateTimePickerVisible}
+              mode="datetime"
+              date={
+                stepDate ??
+                (event?.startDate ? new Date(event.startDate) : new Date())
+              }
+              locale="fr-FR"
+              minuteInterval={5}
+              onConfirm={handleStepDateConfirm}
+              onCancel={handleStepDateCancel}
+            />
             <View style={styles.modalActions}>
               <Pressable
                 style={styles.modalSecondary}
-                onPress={() => setIsStepModalVisible(false)}
+                onPress={closeStepModal}
               >
                 <Text style={styles.modalSecondaryLabel}>Annuler</Text>
               </Pressable>
               <Pressable
                 style={[
                   styles.modalPrimary,
-                  createOrUpdateStepMutation.isPending && styles.disabledButton,
+                  isStepSubmitDisabled && styles.disabledButton,
                 ]}
                 onPress={handleStepSubmit}
-                disabled={createOrUpdateStepMutation.isPending}
+                disabled={isStepSubmitDisabled}
               >
                 <Text style={styles.modalPrimaryLabel}>
                   {createOrUpdateStepMutation.isPending ? "Enregistrement..." : "Enregistrer"}
@@ -1678,6 +1743,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#FFFFFF",
     backgroundColor: "rgba(255,255,255,0.1)",
+  },
+  dateInput: {
+    justifyContent: "center",
+  },
+  dateInputLabel: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  dateInputPlaceholder: {
+    color: "rgba(255,255,255,0.5)",
+    fontSize: 16,
   },
   inputMultiline: {
     minHeight: 96,
