@@ -1,8 +1,8 @@
-import { Redirect } from "expo-router";
+import { Redirect, Stack } from "expo-router";
 import { useAuth } from "@/hooks/use-auth";
 import { FullscreenLoader } from "@/components/ui/fullscreen-loader";
 
-export default function RootRedirectScreen() {
+export default function AuthLayout() {
   const { status } = useAuth();
 
   if (status === "idle" || status === "loading") {
@@ -13,6 +13,14 @@ export default function RootRedirectScreen() {
     return <Redirect href="/(app)" />;
   }
 
-  return <Redirect href="/(auth)/login" />;
+  return (
+    <Stack
+      screenOptions={{
+        headerShown: false,
+        contentStyle: { backgroundColor: "#0C1B33" },
+        animation: "fade",
+      }}
+    />
+  );
 }
 
