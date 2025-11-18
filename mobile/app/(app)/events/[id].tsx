@@ -90,6 +90,8 @@ export default function EventDetailScreen() {
   const [isMembersModalVisible, setIsMembersModalVisible] = useState(false);
   const [isInviteModalVisible, setIsInviteModalVisible] = useState(false);
   const [isStepModalVisible, setIsStepModalVisible] = useState(false);
+  const [isStepDetailModalVisible, setIsStepDetailModalVisible] = useState(false);
+  const [selectedStep, setSelectedStep] = useState<EventStep | null>(null);
   const [isEditEventModalVisible, setIsEditEventModalVisible] = useState(false);
   const [isUpdateConfirmationVisible, setIsUpdateConfirmationVisible] = useState(false);
   const [accessDenied, setAccessDenied] = useState(false);
@@ -700,8 +702,22 @@ export default function EventDetailScreen() {
     setIsUpdateConfirmationVisible(false);
   };
 
+  const handleOpenStepDetail = (step: EventStep) => {
+    setSelectedStep(step);
+    setIsStepDetailModalVisible(true);
+  };
+
+  const handleCloseStepDetail = () => {
+    setIsStepDetailModalVisible(false);
+    setSelectedStep(null);
+  };
+
   const renderStep = (step: EventStep) => (
-    <View key={step.id} style={styles.stepCard}>
+    <Pressable
+      key={step.id}
+      style={({ pressed }) => [styles.stepCard, pressed && styles.cardPressed]}
+      onPress={() => handleOpenStepDetail(step)}
+    >
       <View style={styles.stepHeader}>
         <Text style={styles.stepTitle} numberOfLines={2} ellipsizeMode="tail">
           {step.name}
@@ -710,14 +726,18 @@ export default function EventDetailScreen() {
           <View style={styles.stepActions}>
             <Pressable
               style={styles.stepActionButton}
-              onPress={() => handleOpenStepModal(step)}
+              onPress={(e) => {
+                e.stopPropagation();
+                handleOpenStepModal(step);
+              }}
               accessibilityLabel="Modifier l'étape"
             >
               <Ionicons name="pencil" size={16} color="#50E3C2" />
             </Pressable>
             <Pressable
               style={[styles.stepActionButton, styles.stepActionDelete]}
-              onPress={() =>
+              onPress={(e) => {
+                e.stopPropagation();
                 Alert.alert(
                   "Supprimer l'étape",
                   "Cette action est définitive. Continuer ?",
@@ -729,8 +749,8 @@ export default function EventDetailScreen() {
                       onPress: () => deleteStepMutation.mutate(step.id),
                     },
                   ],
-                )
-              }
+                );
+              }}
               accessibilityLabel="Supprimer l'étape"
             >
               <Ionicons name="trash-outline" size={16} color="#FF8888" />
@@ -738,14 +758,11 @@ export default function EventDetailScreen() {
           </View>
         ) : null}
       </View>
-      {step.description ? (
-        <Text style={styles.stepDescription}>{step.description}</Text>
-      ) : null}
       <View style={styles.stepMeta}>
         <Text style={styles.stepMetaItem}>📍 {step.location || "Lieu à définir"}</Text>
         <Text style={styles.stepMetaItem}>🕒 {formatDateTime(step.scheduledTime)}</Text>
       </View>
-    </View>
+    </Pressable>
   );
 
   const renderMember = (member: EventMember) => {
@@ -1309,6 +1326,112 @@ export default function EventDetailScreen() {
       </Modal>
 
       <Modal
+        visible={isStepDetailModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={handleCloseStepDetail}
+      >
+        <Pressable style={styles.modalOverlay} onPress={handleCloseStepDetail}>
+          <Pressable style={styles.modalContent} onPress={(evt) => evt.stopPropagation()}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle} numberOfLines={0}>
+                {selectedStep?.name || "Détails de l'étape"}
+              </Text>
+              <Pressable
+                onPress={handleCloseStepDetail}
+                style={styles.closeIconButton}
+                accessibilityLabel="Fermer"
+              >
+                <Ionicons name="close" size={18} color="rgba(255,255,255,0.9)" />
+              </Pressable>
+            </View>
+            <ScrollView style={styles.modalScroll}>
+              {selectedStep?.description ? (
+                <View style={styles.stepDetailSection}>
+                  <View style={styles.stepDetailSectionHeader}>
+                    <Ionicons name="document-text-outline" size={20} color="rgba(80, 227, 194, 0.7)" />
+                    <Text style={styles.stepDetailSectionTitle}>Description</Text>
+                  </View>
+                  <Text style={styles.stepDetailText}>{selectedStep.description}</Text>
+                </View>
+              ) : null}
+              <View style={styles.stepDetailSection}>
+                <View style={styles.stepDetailSectionHeader}>
+                  <Ionicons name="location-outline" size={20} color="rgba(80, 227, 194, 0.7)" />
+                  <Text style={styles.stepDetailSectionTitle}>Lieu</Text>
+                </View>
+                <Text style={styles.stepDetailText}>
+                  {selectedStep?.location || "Lieu à définir"}
+                </Text>
+              </View>
+              <View style={styles.stepDetailSection}>
+                <View style={styles.stepDetailSectionHeader}>
+                  <Ionicons name="time-outline" size={20} color="rgba(80, 227, 194, 0.7)" />
+                  <Text style={styles.stepDetailSectionTitle}>Date et heure</Text>
+                </View>
+                <Text style={styles.stepDetailText}>
+                  {selectedStep?.scheduledTime
+                    ? formatDateTime(selectedStep.scheduledTime)
+                    : "Non définie"}
+                </Text>
+              </View>
+            </ScrollView>
+            {isOrganizer && selectedStep ? (
+              <View style={styles.modalActions}>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.modalSecondary,
+                    pressed && styles.buttonPressed,
+                  ]}
+                  onPress={() => {
+                    handleCloseStepDetail();
+                    handleOpenStepModal(selectedStep);
+                  }}
+                >
+                  <Text style={styles.modalSecondaryLabel}>Modifier</Text>
+                </Pressable>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.modalDelete,
+                    pressed && styles.buttonPressed,
+                  ]}
+                  onPress={() => {
+                    handleCloseStepDetail();
+                    Alert.alert(
+                      "Supprimer l'étape",
+                      "Cette action est définitive. Continuer ?",
+                      [
+                        { text: "Annuler", style: "cancel" },
+                        {
+                          text: "Supprimer",
+                          style: "destructive",
+                          onPress: () => deleteStepMutation.mutate(selectedStep.id),
+                        },
+                      ],
+                    );
+                  }}
+                >
+                  <Text style={styles.modalDeleteLabel}>Supprimer</Text>
+                </Pressable>
+              </View>
+            ) : (
+              <View style={styles.modalActions}>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.modalPrimary,
+                    pressed && styles.buttonPressed,
+                  ]}
+                  onPress={handleCloseStepDetail}
+                >
+                  <Text style={styles.modalPrimaryLabel}>Fermer</Text>
+                </Pressable>
+              </View>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      <Modal
         visible={isRequestsModalVisible}
         animationType="slide"
         transparent
@@ -1702,6 +1825,31 @@ const styles = StyleSheet.create({
   stepMetaItem: {
     color: "rgba(255,255,255,0.7)",
   },
+  stepDetailSection: {
+    marginBottom: 20,
+    paddingBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.1)",
+  },
+  stepDetailSectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 10,
+  },
+  stepDetailSectionTitle: {
+    color: "rgba(80, 227, 194, 0.75)",
+    fontSize: 16,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  stepDetailText: {
+    color: "rgba(255,255,255,0.9)",
+    fontSize: 16,
+    lineHeight: 24,
+    paddingLeft: 28,
+  },
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(12, 27, 51, 0.8)",
@@ -1720,12 +1868,27 @@ const styles = StyleSheet.create({
   modalHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
+    alignItems: "flex-start",
+    gap: 12,
+    minWidth: 0,
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: "700",
     color: "#FFFFFF",
+    flex: 1,
+    flexShrink: 1,
+    minWidth: 0,
+  },
+  closeIconButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+    marginTop: -4,
   },
   closeButton: {
     color: "rgba(255,255,255,0.8)",
@@ -1801,6 +1964,16 @@ const styles = StyleSheet.create({
   },
   modalPrimaryLabel: {
     color: "#0C1B33",
+    fontWeight: "700",
+  },
+  modalDelete: {
+    backgroundColor: "#FF6B6B",
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  modalDeleteLabel: {
+    color: "#FFFFFF",
     fontWeight: "700",
   },
   memberCard: {
