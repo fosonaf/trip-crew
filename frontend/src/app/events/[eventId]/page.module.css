@@ -660,15 +660,21 @@
 
 .stepHeader {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
+  min-width: 0;
 }
 
 .stepTitle {
   margin: 0;
   font-size: 1.15rem;
   font-weight: 600;
+  flex: 1;
+  min-width: 0;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  hyphens: auto;
 }
 
 .stepDescription {
@@ -686,21 +692,32 @@
 .stepActions {
   display: inline-flex;
   gap: 8px;
+  flex-shrink: 0;
 }
 
 .stepActionButton {
   width: 32px;
   height: 32px;
+  min-width: 32px;
   border-radius: 50%;
   border: 1px solid rgba(59, 130, 246, 0.45);
   background-color: rgba(59, 130, 246, 0.18);
   color: rgba(59, 130, 246, 1);
   font-weight: 700;
+  font-size: 1rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   transition: transform 150ms ease, box-shadow 150ms ease, opacity 120ms ease;
+  line-height: 1;
+  padding: 0;
+}
+
+.stepActionButton svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
 }
 
 .stepActionButton:hover {
@@ -829,6 +846,46 @@
 
   .layout {
     gap: 20px;
+  }
+
+  .stepCard {
+    padding: 16px 18px;
+  }
+
+  .stepHeader {
+    gap: 10px;
+    align-items: flex-start;
+  }
+
+  .stepTitle {
+    font-size: 1.05rem;
+    line-height: 1.4;
+  }
+
+  .stepActions {
+    gap: 6px;
+  }
+
+  .stepActionButton {
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+    font-size: 1.1rem;
+  }
+
+  .stepActionButton svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .stepDescription {
+    font-size: 0.9rem;
+    line-height: 1.5;
+  }
+
+  .stepMeta {
+    font-size: 0.9rem;
+    gap: 6px;
   }
 }
 

@@ -1161,18 +1161,48 @@ export default function EventDetailPage() {
                             <button
                               type="button"
                               className={styles.stepActionButton}
-                              aria-label="Modifier l’étape"
+                              aria-label="Modifier l'étape"
                               onClick={() => handleEditStep(step)}
                             >
-                              ✎
+                              <svg
+                                width="16"
+                                height="16"
+                                viewBox="0 0 16 16"
+                                fill="none"
+                                xmlns="http://www.w3.org/2000/svg"
+                                aria-hidden="true"
+                              >
+                                <path
+                                  d="M11.333 2.00001C11.5084 1.82445 11.7163 1.68506 11.9451 1.58927C12.1739 1.49347 12.4191 1.44318 12.6667 1.44318C12.9142 1.44318 13.1594 1.49347 13.3882 1.58927C13.617 1.68506 13.8249 1.82445 14 2.00001C14.1756 2.17556 14.315 2.38345 14.4108 2.61223C14.5066 2.84101 14.5569 3.0862 14.5569 3.33368C14.5569 3.58115 14.5066 3.82634 14.4108 4.05512C14.315 4.2839 14.1756 4.49179 14 4.66734L5.00001 13.6673L1.33334 14.6673L2.33334 11.0007L11.333 2.00001Z"
+                                  stroke="currentColor"
+                                  strokeWidth="1.5"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                />
+                              </svg>
                             </button>
                             <button
                               type="button"
                               className={`${styles.stepActionButton} ${styles.stepActionDelete}`}
-                              aria-label="Supprimer l’étape"
+                              aria-label="Supprimer l'étape"
                               onClick={() => handleDeleteStep(step.id)}
                             >
-                              ✕
+                              <svg
+                                width="16"
+                                height="16"
+                                viewBox="0 0 16 16"
+                                fill="none"
+                                xmlns="http://www.w3.org/2000/svg"
+                                aria-hidden="true"
+                              >
+                                <path
+                                  d="M12 4.00001V13.3333C12 13.687 11.8595 14.0261 11.6095 14.2762C11.3594 14.5262 11.0203 14.6667 10.6667 14.6667H5.33334C4.97972 14.6667 4.64058 14.5262 4.39053 14.2762C4.14048 14.0261 4 13.687 4 13.3333V4.00001M6.66667 4.00001V2.66668C6.66667 2.31305 6.80714 1.97392 7.05719 1.72387C7.30724 1.47382 7.64638 1.33334 8.00001 1.33334C8.35363 1.33334 8.69277 1.47382 8.94282 1.72387C9.19287 1.97392 9.33334 2.31305 9.33334 2.66668V4.00001M2.66667 4.00001H13.3333"
+                                  stroke="currentColor"
+                                  strokeWidth="1.5"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                />
+                              </svg>
                             </button>
                           </div>
                         ) : null}

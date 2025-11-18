@@ -12,6 +12,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import DateTimePickerModal from "react-native-modal-datetime-picker";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
@@ -702,20 +703,23 @@ export default function EventDetailScreen() {
   const renderStep = (step: EventStep) => (
     <View key={step.id} style={styles.stepCard}>
       <View style={styles.stepHeader}>
-        <Text style={styles.stepTitle}>{step.name}</Text>
+        <Text style={styles.stepTitle} numberOfLines={2} ellipsizeMode="tail">
+          {step.name}
+        </Text>
         {isOrganizer ? (
           <View style={styles.stepActions}>
             <Pressable
               style={styles.stepActionButton}
               onPress={() => handleOpenStepModal(step)}
+              accessibilityLabel="Modifier l'étape"
             >
-              <Text style={styles.stepActionLabel}>Modifier</Text>
+              <Ionicons name="pencil" size={16} color="#50E3C2" />
             </Pressable>
             <Pressable
               style={[styles.stepActionButton, styles.stepActionDelete]}
               onPress={() =>
                 Alert.alert(
-                  "Supprimer l’étape",
+                  "Supprimer l'étape",
                   "Cette action est définitive. Continuer ?",
                   [
                     { text: "Annuler", style: "cancel" },
@@ -727,8 +731,9 @@ export default function EventDetailScreen() {
                   ],
                 )
               }
+              accessibilityLabel="Supprimer l'étape"
             >
-              <Text style={styles.stepActionLabel}>Supprimer</Text>
+              <Ionicons name="trash-outline" size={16} color="#FF8888" />
             </Pressable>
           </View>
         ) : null}
@@ -1647,27 +1652,37 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 16,
     gap: 12,
+    overflow: "hidden",
   },
   stepHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
+    alignItems: "flex-start",
+    gap: 8,
+    width: "100%",
   },
   stepTitle: {
     color: "#FFFFFF",
     fontSize: 16,
     fontWeight: "700",
+    flex: 1,
+    flexShrink: 1,
+    marginRight: 8,
   },
   stepActions: {
     flexDirection: "row",
-    gap: 8,
+    gap: 6,
+    flexShrink: 0,
   },
   stepActionButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.25)",
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    borderColor: "rgba(80, 227, 194, 0.4)",
+    backgroundColor: "rgba(80, 227, 194, 0.15)",
+    alignItems: "center",
+    justifyContent: "center",
   },
   stepActionLabel: {
     color: "#FFFFFF",
@@ -1675,7 +1690,8 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   stepActionDelete: {
-    borderColor: "#FF8888",
+    borderColor: "rgba(255, 136, 136, 0.4)",
+    backgroundColor: "rgba(255, 136, 136, 0.15)",
   },
   stepDescription: {
     color: "rgba(255,255,255,0.75)",
