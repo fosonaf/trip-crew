@@ -341,7 +341,7 @@ export default function AppHomeScreen() {
           </View>
         ) : null}
 
-        <View style={styles.eventsCard}>
+        <View style={[styles.eventsCard, styles.eventsCardTight]}>
           <View style={styles.eventsHeader}>
             <View style={styles.eventsHeaderText}>
               <Text style={styles.eventsTitle}>
@@ -349,29 +349,7 @@ export default function AppHomeScreen() {
                   "Tes évènements"
                 ) : eventsQuery.data && eventsQuery.data.length > 0 ? (
                   <>
-                    <Text style={styles.eventsTitleAccent}>
-                      {eventsQuery.data.length === 1
-                        ? "Un"
-                        : eventsQuery.data.length === 2
-                          ? "Deux"
-                          : eventsQuery.data.length === 3
-                            ? "Trois"
-                            : eventsQuery.data.length === 4
-                              ? "Quatre"
-                              : eventsQuery.data.length === 5
-                                ? "Cinq"
-                                : eventsQuery.data.length === 6
-                                  ? "Six"
-                                  : eventsQuery.data.length === 7
-                                    ? "Sept"
-                                    : eventsQuery.data.length === 8
-                                      ? "Huit"
-                                      : eventsQuery.data.length === 9
-                                        ? "Neuf"
-                                        : eventsQuery.data.length === 10
-                                          ? "Dix"
-                                          : eventsQuery.data.length}
-                    </Text>
+                    <Text style={styles.eventsTitleAccent}>{eventsQuery.data.length}</Text>
                     <Text> {eventsQuery.data.length === 1 ? "évènement" : "évènements"}</Text>
                   </>
                 ) : (
@@ -549,6 +527,9 @@ const styles = StyleSheet.create({
     paddingRight: 24,
     gap: 20,
     overflow: "hidden",
+  },
+  eventsCardTight: {
+    marginTop: -8,
   },
   eventsHeader: {
     flexDirection: "row",
