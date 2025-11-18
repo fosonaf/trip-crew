@@ -297,22 +297,36 @@ export default function AppHomeScreen() {
           </Text>
           <View style={styles.heroActions}>
             <Pressable
-              style={({ pressed }) => [styles.primaryButton, pressed && styles.buttonPressed]}
+              style={({ pressed }) => [
+                styles.buttonWrapper,
+                pressed && styles.buttonWrapperPressed,
+              ]}
               onPress={() => router.push("/(app)/events/new")}
             >
-              <View style={styles.buttonContent}>
-                <Ionicons name="add-circle-outline" size={20} color="rgba(80, 227, 194, 0.9)" />
-                <Text style={styles.primaryButtonLabel}>Créer un événement</Text>
-              </View>
+              {({ pressed }) => (
+                <View style={[styles.primaryButton, pressed && styles.primaryButtonPressed]}>
+                  <View style={styles.buttonContent}>
+                    <Ionicons name="add-circle-outline" size={20} color="#50E3C2" />
+                    <Text style={styles.primaryButtonLabel}>Créer un événement</Text>
+                  </View>
+                </View>
+              )}
             </Pressable>
             <Pressable
-              style={({ pressed }) => [styles.secondaryButton, pressed && styles.buttonPressed]}
+              style={({ pressed }) => [
+                styles.buttonWrapper,
+                pressed && styles.buttonWrapperPressed,
+              ]}
               onPress={openJoinModal}
             >
-              <View style={styles.buttonContent}>
-                <Ionicons name="person-add-outline" size={20} color="#FFFFFF" />
-                <Text style={styles.secondaryButtonLabel}>Rejoindre un événement</Text>
-              </View>
+              {({ pressed }) => (
+                <View style={[styles.secondaryButton, pressed && styles.secondaryButtonPressed]}>
+                  <View style={styles.buttonContent}>
+                    <Ionicons name="person-add-outline" size={20} color="#FFFFFF" />
+                    <Text style={styles.secondaryButtonLabel}>Rejoindre un événement</Text>
+                  </View>
+                </View>
+              )}
             </Pressable>
           </View>
         </View>
@@ -486,17 +500,36 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: 12,
   },
+  buttonWrapper: {
+    flex: 1,
+    minWidth: 160,
+  },
+  buttonWrapperPressed: {
+    transform: [{ scale: 0.98 }],
+  },
   primaryButton: {
-    backgroundColor: "rgba(80, 227, 194, 0.25)",
-    borderWidth: 1,
-    borderColor: "rgba(80, 227, 194, 0.4)",
+    backgroundColor: "rgba(80, 227, 194, 0.3)",
+    borderWidth: 1.5,
+    borderColor: "rgba(80, 227, 194, 0.6)",
     paddingHorizontal: 20,
     paddingVertical: 14,
     borderRadius: 14,
-    flex: 1,
-    minWidth: 160,
     alignItems: "stretch",
     justifyContent: "center",
+    shadowColor: "rgba(80, 227, 194, 0.6)",
+    shadowOffset: {
+      width: 0,
+      height: 0,
+    },
+    shadowOpacity: 0.8,
+    shadowRadius: 2,
+    elevation: 0,
+  },
+  primaryButtonPressed: {
+    backgroundColor: "rgba(80, 227, 194, 0.4)",
+    borderColor: "rgba(80, 227, 194, 0.8)",
+    transform: [{ translateY: 2 }],
+    shadowRadius: 1,
   },
   buttonContent: {
     flexDirection: "row",
@@ -505,25 +538,40 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   primaryButtonLabel: {
-    color: "rgba(80, 227, 194, 0.9)",
+    color: "#50E3C2",
     fontSize: 16,
     fontWeight: "700",
+    letterSpacing: 0.2,
   },
   secondaryButton: {
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.3)",
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    borderWidth: 1.5,
+    borderColor: "rgba(255, 255, 255, 0.4)",
     paddingHorizontal: 20,
     paddingVertical: 14,
     borderRadius: 14,
-    flex: 1,
-    minWidth: 160,
     alignItems: "stretch",
     justifyContent: "center",
+    shadowColor: "rgba(255, 255, 255, 0.4)",
+    shadowOffset: {
+      width: 0,
+      height: 0,
+    },
+    shadowOpacity: 0.6,
+    shadowRadius: 2,
+    elevation: 0,
+  },
+  secondaryButtonPressed: {
+    backgroundColor: "rgba(255, 255, 255, 0.15)",
+    borderColor: "rgba(255, 255, 255, 0.6)",
+    transform: [{ translateY: 2 }],
+    shadowRadius: 1,
   },
   secondaryButtonLabel: {
     color: "#FFFFFF",
     fontSize: 16,
     fontWeight: "600",
+    letterSpacing: 0.2,
   },
   buttonPressed: {
     opacity: 0.7,
