@@ -10,6 +10,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
 import { useAuth } from "@/hooks/use-auth";
@@ -299,13 +300,19 @@ export default function AppHomeScreen() {
               style={({ pressed }) => [styles.primaryButton, pressed && styles.buttonPressed]}
               onPress={() => router.push("/(app)/events/new")}
             >
-              <Text style={styles.primaryButtonLabel}>Créer un événement</Text>
+              <View style={styles.buttonContent}>
+                <Ionicons name="add-circle-outline" size={20} color="rgba(80, 227, 194, 0.9)" />
+                <Text style={styles.primaryButtonLabel}>Créer un événement</Text>
+              </View>
             </Pressable>
             <Pressable
               style={({ pressed }) => [styles.secondaryButton, pressed && styles.buttonPressed]}
               onPress={openJoinModal}
             >
-              <Text style={styles.secondaryButtonLabel}>Rejoindre un événement</Text>
+              <View style={styles.buttonContent}>
+                <Ionicons name="person-add-outline" size={20} color="#FFFFFF" />
+                <Text style={styles.secondaryButtonLabel}>Rejoindre un événement</Text>
+              </View>
             </Pressable>
           </View>
         </View>
@@ -488,7 +495,14 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     flex: 1,
     minWidth: 160,
+    alignItems: "stretch",
+    justifyContent: "center",
+  },
+  buttonContent: {
+    flexDirection: "row",
     alignItems: "center",
+    justifyContent: "flex-start",
+    gap: 8,
   },
   primaryButtonLabel: {
     color: "rgba(80, 227, 194, 0.9)",
@@ -503,7 +517,8 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     flex: 1,
     minWidth: 160,
-    alignItems: "center",
+    alignItems: "stretch",
+    justifyContent: "center",
   },
   secondaryButtonLabel: {
     color: "#FFFFFF",
