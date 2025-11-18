@@ -343,15 +343,43 @@ export default function AppHomeScreen() {
 
         <View style={styles.eventsCard}>
           <View style={styles.eventsHeader}>
-            <View>
-              <Text style={styles.eventsTitle}>Tes évènements</Text>
-              <Text style={styles.eventsSubtitle}>
-                Tous les voyages auxquels tu participes, en tant qu’organisateur ou membre.
+            <View style={styles.eventsHeaderText}>
+              <Text style={styles.eventsTitle}>
+                {eventsQuery.isLoading ? (
+                  "Tes évènements"
+                ) : eventsQuery.data && eventsQuery.data.length > 0 ? (
+                  <>
+                    <Text style={styles.eventsTitleAccent}>
+                      {eventsQuery.data.length === 1
+                        ? "Un"
+                        : eventsQuery.data.length === 2
+                          ? "Deux"
+                          : eventsQuery.data.length === 3
+                            ? "Trois"
+                            : eventsQuery.data.length === 4
+                              ? "Quatre"
+                              : eventsQuery.data.length === 5
+                                ? "Cinq"
+                                : eventsQuery.data.length === 6
+                                  ? "Six"
+                                  : eventsQuery.data.length === 7
+                                    ? "Sept"
+                                    : eventsQuery.data.length === 8
+                                      ? "Huit"
+                                      : eventsQuery.data.length === 9
+                                        ? "Neuf"
+                                        : eventsQuery.data.length === 10
+                                          ? "Dix"
+                                          : eventsQuery.data.length}
+                    </Text>
+                    <Text> {eventsQuery.data.length === 1 ? "évènement" : "évènements"}</Text>
+                  </>
+                ) : (
+                  "Aucun évènement"
+                )}
               </Text>
-            </View>
-            <View style={styles.counter}>
-              <Text style={styles.counterLabel}>
-                {eventsQuery.data?.length ?? (eventsQuery.isLoading ? "-" : "0")}
+              <Text style={styles.eventsSubtitle}>
+                Tous les voyages auxquels tu participes, en tant qu'organisateur ou membre.
               </Text>
             </View>
           </View>
@@ -518,19 +546,28 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(12, 27, 51, 0.6)",
     borderRadius: 24,
     padding: 24,
+    paddingRight: 24,
     gap: 20,
+    overflow: "hidden",
   },
   eventsHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    gap: 16,
-    paddingRight: 4,
+    gap: 12,
+    width: "100%",
+  },
+  eventsHeaderText: {
+    flex: 1,
+    minWidth: 0,
   },
   eventsTitle: {
     fontSize: 20,
     fontWeight: "700",
     color: "#FFFFFF",
+  },
+  eventsTitleAccent: {
+    color: "rgba(80, 227, 194, 0.9)",
   },
   eventsSubtitle: {
     fontSize: 14,
@@ -543,7 +580,9 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(80, 227, 194, 0.2)",
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
+    flexShrink: 0,
+    marginRight: 0,
   },
   counterLabel: {
     color: "#50E3C2",
