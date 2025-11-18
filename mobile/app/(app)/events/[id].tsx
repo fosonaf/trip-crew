@@ -994,53 +994,67 @@ export default function EventDetailScreen() {
           ) : event ? (
             <>
               <View style={styles.topActions}>
-                <View style={styles.topButtonsRow}>
-                  <Pressable style={styles.ghostButton} onPress={handleOpenMembersModal}>
-                    <Text style={styles.ghostButtonLabel}>Membres</Text>
+                <View style={styles.primaryActionsRow}>
+                  <Pressable
+                    style={styles.primaryButton}
+                    onPress={() => handleOpenStepModal()}
+                  >
+                    <Ionicons name="add-circle-outline" size={20} color="rgba(80, 227, 194, 0.9)" />
+                    <Text style={styles.primaryButtonLabel}>Ajouter une étape</Text>
+                  </Pressable>
+                  {isOrganizer ? (
+                    <Pressable style={styles.ghostButton} onPress={handleOpenInviteModal}>
+                      <Ionicons name="person-add-outline" size={18} color="#FFFFFF" />
+                      <Text style={styles.ghostButtonLabel}>Inviter</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+                <View style={styles.secondaryActionsRow}>
+                  <Pressable style={styles.iconButton} onPress={handleOpenMembersModal}>
+                    <Ionicons name="people-outline" size={20} color="#FFFFFF" />
+                    <Text style={styles.iconButtonLabel}>Membres</Text>
                   </Pressable>
                   {isOrganizer ? (
                     <>
                       <Pressable
-                        style={styles.ghostButton}
+                        style={styles.iconButton}
                         onPress={handleOpenEditEventModal}
                       >
-                        <Text style={styles.ghostButtonLabel}>Modifier</Text>
+                        <Ionicons name="create-outline" size={20} color="#FFFFFF" />
+                        <Text style={styles.iconButtonLabel}>Modifier</Text>
                       </Pressable>
-                      <Pressable style={styles.ghostButton} onPress={handleOpenRequestsModal}>
-                        <Text style={styles.ghostButtonLabel}>
-                          Demandes ({pendingJoinRequests})
+                      <Pressable style={styles.iconButton} onPress={handleOpenRequestsModal}>
+                        <Ionicons name="mail-outline" size={20} color="#FFFFFF" />
+                        <Text style={styles.iconButtonLabel}>
+                          {pendingJoinRequests > 0 ? pendingJoinRequests : ""}
                         </Text>
-                      </Pressable>
-                      <Pressable style={styles.ghostButton} onPress={handleOpenInviteModal}>
-                        <Text style={styles.ghostButtonLabel}>Inviter</Text>
-                      </Pressable>
-                      <Pressable
-                        style={styles.primaryButton}
-                        onPress={() => handleOpenStepModal()}
-                      >
-                        <Text style={styles.primaryButtonLabel}>Ajouter une étape</Text>
                       </Pressable>
                     </>
                   ) : null}
-                  <Pressable
-                    style={[
-                      styles.dangerButton,
-                      (!canLeaveEvent || leaveEventMutation.isPending) && styles.disabledButton,
-                    ]}
-                    onPress={handleLeaveEvent}
-                    disabled={!canLeaveEvent || leaveEventMutation.isPending}
-                  >
-                    <Text style={styles.dangerButtonLabel}>
-                      {leaveEventMutation.isPending
-                        ? "Départ..."
-                        : canLeaveEvent
-                          ? "Quitter"
-                          : isAdmin
-                            ? "Administrateur"
-                            : "Dernier organisateur"}
-                    </Text>
-                  </Pressable>
                 </View>
+                <Pressable
+                  style={[
+                    styles.dangerButton,
+                    (!canLeaveEvent || leaveEventMutation.isPending) && styles.disabledButton,
+                  ]}
+                  onPress={handleLeaveEvent}
+                  disabled={!canLeaveEvent || leaveEventMutation.isPending}
+                >
+                  <Ionicons
+                    name="exit-outline"
+                    size={18}
+                    color={canLeaveEvent ? "#FFAAAA" : "rgba(255,170,170,0.6)"}
+                  />
+                  <Text style={styles.dangerButtonLabel}>
+                    {leaveEventMutation.isPending
+                      ? "Départ..."
+                      : canLeaveEvent
+                        ? "Quitter"
+                        : isAdmin
+                          ? "Administrateur"
+                          : "Dernier organisateur"}
+                  </Text>
+                </Pressable>
               </View>
 
               <View style={styles.section}>
@@ -1655,43 +1669,80 @@ const styles = StyleSheet.create({
   topActions: {
     gap: 12,
   },
-  topButtonsRow: {
+  primaryActionsRow: {
     flexDirection: "row",
+    gap: 10,
     flexWrap: "wrap",
+  },
+  secondaryActionsRow: {
+    flexDirection: "row",
     gap: 8,
-    alignItems: "center",
+    flexWrap: "wrap",
   },
   ghostButton: {
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.25)",
     borderRadius: 12,
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
     paddingVertical: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
   },
   ghostButtonLabel: {
     color: "#FFFFFF",
     fontWeight: "600",
+    fontSize: 14,
   },
   primaryButton: {
-    backgroundColor: "#50E3C2",
+    backgroundColor: "rgba(80, 227, 194, 0.25)",
+    borderWidth: 1,
+    borderColor: "rgba(80, 227, 194, 0.4)",
     borderRadius: 12,
-    paddingHorizontal: 18,
+    paddingHorizontal: 16,
     paddingVertical: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    flex: 1,
+    minWidth: 160,
   },
   primaryButtonLabel: {
-    color: "#0C1B33",
+    color: "rgba(80, 227, 194, 0.9)",
     fontWeight: "700",
+    fontSize: 15,
+  },
+  iconButton: {
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.2)",
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "rgba(255,255,255,0.05)",
+  },
+  iconButtonLabel: {
+    color: "#FFFFFF",
+    fontWeight: "600",
+    fontSize: 13,
   },
   dangerButton: {
     borderRadius: 12,
-    paddingHorizontal: 18,
+    paddingHorizontal: 16,
     paddingVertical: 12,
     borderWidth: 1,
     borderColor: "#FF8888",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    justifyContent: "center",
   },
   dangerButtonLabel: {
     color: "#FFAAAA",
     fontWeight: "600",
+    fontSize: 14,
   },
   disabledButton: {
     opacity: 0.6,
@@ -1960,10 +2011,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: 12,
-    backgroundColor: "#50E3C2",
+    backgroundColor: "rgba(80, 227, 194, 0.25)",
+    borderWidth: 1,
+    borderColor: "rgba(80, 227, 194, 0.4)",
   },
   modalPrimaryLabel: {
-    color: "#0C1B33",
+    color: "rgba(80, 227, 194, 0.9)",
     fontWeight: "700",
   },
   modalDelete: {
@@ -2055,7 +2108,9 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   invitationAccept: {
-    backgroundColor: "#50E3C2",
+    backgroundColor: "rgba(80, 227, 194, 0.25)",
+    borderWidth: 1,
+    borderColor: "rgba(80, 227, 194, 0.4)",
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 8,
@@ -2065,7 +2120,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   invitationAcceptLabel: {
-    color: "#0C1B33",
+    color: "rgba(80, 227, 194, 0.9)",
     fontWeight: "700",
   },
   invitationList: {
@@ -2121,14 +2176,16 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.25)",
   },
   requestAccept: {
-    backgroundColor: "#50E3C2",
+    backgroundColor: "rgba(80, 227, 194, 0.25)",
+    borderWidth: 1,
+    borderColor: "rgba(80, 227, 194, 0.4)",
   },
   requestButtonLabel: {
     color: "#FFFFFF",
     fontWeight: "600",
   },
   requestButtonLabelAccent: {
-    color: "#0C1B33",
+    color: "rgba(80, 227, 194, 0.9)",
   },
   switchRow: {
     flexDirection: "row",

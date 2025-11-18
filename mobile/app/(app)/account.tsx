@@ -417,7 +417,9 @@ const styles = StyleSheet.create({
     color: "#9CF2DE",
   },
   button: {
-    backgroundColor: "#50E3C2",
+    backgroundColor: "rgba(80, 227, 194, 0.25)",
+    borderWidth: 1,
+    borderColor: "rgba(80, 227, 194, 0.4)",
     borderRadius: 16,
     paddingVertical: 16,
     alignItems: "center",
@@ -428,7 +430,7 @@ const styles = StyleSheet.create({
   buttonLabel: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#0C1B33",
+    color: "rgba(80, 227, 194, 0.9)",
   },
 });
 
