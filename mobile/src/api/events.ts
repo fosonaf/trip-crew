@@ -10,6 +10,9 @@ import type {
 } from "@/types/event";
 
 export const eventApi = {
+  create(payload: CreateEventPayload) {
+    return apiClient.post<EventSummary>("/events", payload).then((res) => res.data);
+  },
   list() {
     return apiClient.get<EventSummary[]>("/events").then((res) => res.data);
   },

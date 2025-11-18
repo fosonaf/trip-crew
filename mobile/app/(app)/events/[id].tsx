@@ -994,67 +994,56 @@ export default function EventDetailScreen() {
           ) : event ? (
             <>
               <View style={styles.topActions}>
-                <View style={styles.primaryActionsRow}>
-                  <Pressable
-                    style={styles.primaryButton}
-                    onPress={() => handleOpenStepModal()}
-                  >
-                    <Ionicons name="add-circle-outline" size={20} color="rgba(80, 227, 194, 0.9)" />
-                    <Text style={styles.primaryButtonLabel}>Ajouter une étape</Text>
-                  </Pressable>
-                  {isOrganizer ? (
-                    <Pressable style={styles.ghostButton} onPress={handleOpenInviteModal}>
-                      <Ionicons name="person-add-outline" size={18} color="#FFFFFF" />
-                      <Text style={styles.ghostButtonLabel}>Inviter</Text>
-                    </Pressable>
-                  ) : null}
-                </View>
-                <View style={styles.secondaryActionsRow}>
-                  <Pressable style={styles.iconButton} onPress={handleOpenMembersModal}>
-                    <Ionicons name="people-outline" size={20} color="#FFFFFF" />
-                    <Text style={styles.iconButtonLabel}>Membres</Text>
-                  </Pressable>
+                <View style={styles.actionsRow}>
                   {isOrganizer ? (
                     <>
-                      <Pressable
-                        style={styles.iconButton}
-                        onPress={handleOpenEditEventModal}
-                      >
-                        <Ionicons name="create-outline" size={20} color="#FFFFFF" />
-                        <Text style={styles.iconButtonLabel}>Modifier</Text>
-                      </Pressable>
                       <Pressable style={styles.iconButton} onPress={handleOpenRequestsModal}>
-                        <Ionicons name="mail-outline" size={20} color="#FFFFFF" />
-                        <Text style={styles.iconButtonLabel}>
-                          {pendingJoinRequests > 0 ? pendingJoinRequests : ""}
-                        </Text>
+                        <Ionicons name="mail-outline" size={18} color="#FFFFFF" />
+                        {pendingJoinRequests > 0 && (
+                          <View style={styles.badge}>
+                            <Text style={styles.badgeText}>{pendingJoinRequests}</Text>
+                          </View>
+                        )}
+                        <Text style={styles.iconButtonLabel}>Demandes</Text>
+                      </Pressable>
+                      <Pressable style={styles.iconButton} onPress={handleOpenInviteModal}>
+                        <Ionicons name="person-add-outline" size={18} color="#FFFFFF" />
+                        <Text style={styles.iconButtonLabel}>Inviter</Text>
+                      </Pressable>
+                      <Pressable style={styles.iconButton} onPress={handleOpenEditEventModal}>
+                        <Ionicons name="create-outline" size={18} color="#FFFFFF" />
+                        <Text style={styles.iconButtonLabel}>Modifier</Text>
                       </Pressable>
                     </>
                   ) : null}
+                  <Pressable style={styles.iconButton} onPress={handleOpenMembersModal}>
+                    <Ionicons name="people-outline" size={18} color="#FFFFFF" />
+                    <Text style={styles.iconButtonLabel}>Membres</Text>
+                  </Pressable>
+                  <Pressable
+                    style={[
+                      styles.dangerButton,
+                      (!canLeaveEvent || leaveEventMutation.isPending) && styles.disabledButton,
+                    ]}
+                    onPress={handleLeaveEvent}
+                    disabled={!canLeaveEvent || leaveEventMutation.isPending}
+                  >
+                    <Ionicons
+                      name="exit-outline"
+                      size={16}
+                      color={canLeaveEvent ? "#FFAAAA" : "rgba(255,170,170,0.6)"}
+                    />
+                    <Text style={styles.dangerButtonLabel}>
+                      {leaveEventMutation.isPending
+                        ? "Départ..."
+                        : canLeaveEvent
+                          ? "Quitter"
+                          : isAdmin
+                            ? "Admin"
+                            : "Dernier org."}
+                    </Text>
+                  </Pressable>
                 </View>
-                <Pressable
-                  style={[
-                    styles.dangerButton,
-                    (!canLeaveEvent || leaveEventMutation.isPending) && styles.disabledButton,
-                  ]}
-                  onPress={handleLeaveEvent}
-                  disabled={!canLeaveEvent || leaveEventMutation.isPending}
-                >
-                  <Ionicons
-                    name="exit-outline"
-                    size={18}
-                    color={canLeaveEvent ? "#FFAAAA" : "rgba(255,170,170,0.6)"}
-                  />
-                  <Text style={styles.dangerButtonLabel}>
-                    {leaveEventMutation.isPending
-                      ? "Départ..."
-                      : canLeaveEvent
-                        ? "Quitter"
-                        : isAdmin
-                          ? "Administrateur"
-                          : "Dernier organisateur"}
-                  </Text>
-                </Pressable>
               </View>
 
               <View style={styles.section}>
@@ -1125,6 +1114,15 @@ export default function EventDetailScreen() {
                 ) : (
                   <View style={styles.stepsList}>{event.steps.map(renderStep)}</View>
                 )}
+                {isOrganizer ? (
+                  <Pressable
+                    style={styles.primaryButton}
+                    onPress={() => handleOpenStepModal()}
+                  >
+                    <Ionicons name="add-circle-outline" size={20} color="rgba(80, 227, 194, 0.9)" />
+                    <Text style={styles.primaryButtonLabel}>Ajouter une étape</Text>
+                  </Pressable>
+                ) : null}
               </View>
             </>
           ) : null}
@@ -1667,32 +1665,31 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   topActions: {
-    gap: 12,
-  },
-  primaryActionsRow: {
-    flexDirection: "row",
-    gap: 10,
-    flexWrap: "wrap",
-  },
-  secondaryActionsRow: {
-    flexDirection: "row",
     gap: 8,
-    flexWrap: "wrap",
   },
-  ghostButton: {
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.25)",
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+  actionsRow: {
     flexDirection: "row",
-    alignItems: "center",
     gap: 6,
+    flexWrap: "wrap",
+    alignItems: "center",
   },
-  ghostButtonLabel: {
-    color: "#FFFFFF",
-    fontWeight: "600",
-    fontSize: 14,
+  badge: {
+    position: "absolute",
+    top: -4,
+    right: -4,
+    backgroundColor: "#50E3C2",
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 4,
+    zIndex: 1,
+  },
+  badgeText: {
+    color: "#0C1B33",
+    fontSize: 11,
+    fontWeight: "700",
   },
   primaryButton: {
     backgroundColor: "rgba(80, 227, 194, 0.25)",
@@ -1715,34 +1712,35 @@ const styles = StyleSheet.create({
   iconButton: {
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.2)",
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 5,
     backgroundColor: "rgba(255,255,255,0.05)",
+    position: "relative",
   },
   iconButtonLabel: {
     color: "#FFFFFF",
     fontWeight: "600",
-    fontSize: 13,
+    fontSize: 12,
   },
   dangerButton: {
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     borderWidth: 1,
     borderColor: "#FF8888",
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 6,
     justifyContent: "center",
   },
   dangerButtonLabel: {
     color: "#FFAAAA",
     fontWeight: "600",
-    fontSize: 14,
+    fontSize: 12,
   },
   disabledButton: {
     opacity: 0.6,

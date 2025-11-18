@@ -1012,32 +1012,6 @@ export default function EventDetailPage() {
               ← Retour aux évènements
             </Link>
             <div className={styles.topActions}>
-              <button
-                type="button"
-                className={styles.ghostAction}
-                onClick={() => setIsMembersModalOpen(true)}
-                disabled={!event}
-              >
-                Voir les membres
-              </button>
-              {isOrganizer ? (
-                <button
-                  type="button"
-                  className={styles.ghostAction}
-                  onClick={openEditEventModal}
-                  disabled={!event}
-                >
-                  Modifier l’évènement
-                </button>
-              ) : null}
-              <button
-                type="button"
-                className={styles.leaveAction}
-                onClick={handleLeaveEvent}
-                disabled={!canLeaveEvent || isLeaving}
-              >
-                {leaveButtonLabel}
-              </button>
               {isOrganizer ? (
                 <>
                   <button
@@ -1045,8 +1019,9 @@ export default function EventDetailPage() {
                     className={`${styles.ghostAction} ${styles.notificationAction}`}
                     onClick={openRequestsModal}
                     disabled={!event}
+                    title="Demandes d'invitations"
                   >
-                    Demandes d’invitations
+                    Demandes
                     <span
                       className={`${styles.notificationBadge} ${
                         pendingJoinRequests > 0 ? styles.notificationBadgeActive : ""
@@ -1060,18 +1035,39 @@ export default function EventDetailPage() {
                     className={styles.ghostAction}
                     onClick={openInviteModal}
                     disabled={!event}
+                    title="Inviter un membre"
                   >
-                    Inviter un membre
+                    Inviter
                   </button>
                   <button
                     type="button"
-                    className={styles.primaryAction}
-                    onClick={openCreateStepModal}
+                    className={styles.ghostAction}
+                    onClick={openEditEventModal}
+                    disabled={!event}
+                    title="Modifier l'évènement"
                   >
-                    Ajouter une étape
+                    Modifier
                   </button>
                 </>
               ) : null}
+              <button
+                type="button"
+                className={styles.ghostAction}
+                onClick={() => setIsMembersModalOpen(true)}
+                disabled={!event}
+                title="Voir les membres"
+              >
+                Membres
+              </button>
+              <button
+                type="button"
+                className={styles.leaveAction}
+                onClick={handleLeaveEvent}
+                disabled={!canLeaveEvent || isLeaving}
+                title={leaveButtonLabel}
+              >
+                {leaveButtonLabel.length > 20 ? leaveButtonLabel.split(" ")[0] : leaveButtonLabel}
+              </button>
             </div>
           </div>
 
@@ -1149,7 +1145,7 @@ export default function EventDetailPage() {
               </header>
 
               {event.steps.length === 0 ? (
-                <div className={styles.emptyState}>Aucune étape planifiée pour l’instant.</div>
+                <div className={styles.emptyState}>Aucune étape planifiée pour l'instant.</div>
               ) : (
                 <div className={styles.stepsList}>
                   {event.steps.map((step) => (
@@ -1218,6 +1214,17 @@ export default function EventDetailPage() {
                   ))}
                 </div>
               )}
+              {isOrganizer ? (
+                <div style={{ marginTop: "16px" }}>
+                  <button
+                    type="button"
+                    className={styles.primaryAction}
+                    onClick={openCreateStepModal}
+                  >
+                    Ajouter une étape
+                  </button>
+                </div>
+              ) : null}
           </section>
         ) : null}
       </div>
