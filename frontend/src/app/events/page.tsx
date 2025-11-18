@@ -347,7 +347,7 @@ export default function EventsPage() {
                   Annuler
                 </button>
                 <button type="submit" className={styles.joinPrimary} disabled={isRequestingJoin}>
-                  {isRequestingJoin ? "Envoi…" : "Envoyer la demande"}
+                  {isRequestingJoin ? "Envoi…" : "Envoyer"}
                 </button>
               </div>
             </form>

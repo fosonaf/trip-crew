@@ -420,24 +420,54 @@ export default function AppHomeScreen() {
       >
         <Pressable style={styles.modalOverlay} onPress={closeJoinModal}>
           <Pressable style={styles.modalContent} onPress={(event) => event.stopPropagation()}>
-            <Text style={styles.modalTitle}>Rejoindre un évènement</Text>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Rejoindre un évènement</Text>
+              <Pressable
+                style={styles.modalCloseButton}
+                onPress={closeJoinModal}
+                disabled={joinMutation.isPending}
+              >
+                <Ionicons name="close" size={24} color="rgba(255, 255, 255, 0.7)" />
+              </Pressable>
+            </View>
             <Text style={styles.modalSubtitle}>
-              Demande envoyée uniquement si l’évènement existe et que tu n’en fais pas encore partie.
+              Demande envoyée uniquement si l'évènement existe et que tu n'en fais pas encore partie.
             </Text>
-            <TextInput
-              value={joinEventId}
-              onChangeText={setJoinEventId}
-              placeholder="Identifiant (ex : 123)"
-              placeholderTextColor="rgba(12,27,51,0.4)"
-              keyboardType="number-pad"
-              style={styles.modalInput}
-              editable={!joinMutation.isPending}
-            />
-            {joinError ? <Text style={styles.modalError}>{joinError}</Text> : null}
-            {joinSuccess ? <Text style={styles.modalSuccess}>{joinSuccess}</Text> : null}
+            <View style={styles.modalInputContainer}>
+              <Ionicons
+                name="key-outline"
+                size={20}
+                color="rgba(80, 227, 194, 0.7)"
+                style={styles.modalInputIcon}
+              />
+              <TextInput
+                value={joinEventId}
+                onChangeText={setJoinEventId}
+                placeholder="Identifiant (ex : 123)"
+                placeholderTextColor="rgba(255, 255, 255, 0.4)"
+                keyboardType="number-pad"
+                style={styles.modalInput}
+                editable={!joinMutation.isPending}
+              />
+            </View>
+            {joinError ? (
+              <View style={styles.modalMessageContainer}>
+                <Ionicons name="alert-circle-outline" size={18} color="#FF6B6B" />
+                <Text style={styles.modalError}>{joinError}</Text>
+              </View>
+            ) : null}
+            {joinSuccess ? (
+              <View style={styles.modalMessageContainer}>
+                <Ionicons name="checkmark-circle-outline" size={18} color="#50E3C2" />
+                <Text style={styles.modalSuccess}>{joinSuccess}</Text>
+              </View>
+            ) : null}
             <View style={styles.modalActions}>
               <Pressable
-                style={({ pressed }) => [styles.modalSecondary, pressed && styles.buttonPressed]}
+                style={({ pressed }) => [
+                  styles.modalSecondary,
+                  pressed && styles.modalButtonPressed,
+                ]}
                 onPress={closeJoinModal}
                 disabled={joinMutation.isPending}
               >
@@ -447,14 +477,19 @@ export default function AppHomeScreen() {
                 style={({ pressed }) => [
                   styles.modalPrimary,
                   joinMutation.isPending && styles.disabledButton,
-                  pressed && styles.buttonPressed,
+                  pressed && styles.modalButtonPressed,
                 ]}
                 onPress={handleJoin}
                 disabled={joinMutation.isPending}
               >
-                <Text style={styles.modalPrimaryLabel}>
-                  {joinMutation.isPending ? "Envoi..." : "Envoyer la demande"}
-                </Text>
+                {joinMutation.isPending ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <>
+                    <Ionicons name="send-outline" size={16} color="#FFFFFF" />
+                    <Text style={styles.modalPrimaryLabel}>Envoyer la demande</Text>
+                  </>
+                )}
               </Pressable>
             </View>
           </Pressable>
@@ -742,66 +777,145 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(12, 27, 51, 0.8)",
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
     justifyContent: "center",
     padding: 24,
   },
   modalContent: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "rgba(12, 27, 51, 0.95)",
     borderRadius: 24,
     padding: 24,
-    gap: 16,
+    gap: 20,
+    borderWidth: 1,
+    borderColor: "rgba(80, 227, 194, 0.2)",
+    shadowColor: "rgba(80, 227, 194, 0.3)",
+    shadowOffset: {
+      width: 0,
+      height: 8,
+    },
+    shadowOpacity: 0.5,
+    shadowRadius: 20,
+    elevation: 10,
+    overflow: "hidden",
+    maxWidth: "100%",
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 4,
   },
   modalTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: "700",
-    color: "#0C1B33",
+    color: "#FFFFFF",
+    letterSpacing: 0.3,
+  },
+  modalCloseButton: {
+    padding: 4,
   },
   modalSubtitle: {
     fontSize: 14,
-    color: "rgba(12,27,51,0.6)",
+    color: "rgba(255, 255, 255, 0.7)",
+    lineHeight: 20,
+  },
+  modalInputContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255, 255, 255, 0.08)",
+    borderWidth: 1.5,
+    borderColor: "rgba(80, 227, 194, 0.3)",
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    gap: 12,
+  },
+  modalInputIcon: {
+    marginRight: 0,
   },
   modalInput: {
-    borderWidth: 1,
-    borderColor: "rgba(12,27,51,0.16)",
-    borderRadius: 12,
-    paddingHorizontal: 16,
+    flex: 1,
     paddingVertical: 14,
     fontSize: 16,
-    color: "#0C1B33",
+    color: "#FFFFFF",
+  },
+  modalMessageContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
+    padding: 12,
+    borderRadius: 12,
   },
   modalError: {
-    color: "#D64545",
+    color: "#FF6B6B",
     fontSize: 14,
+    fontWeight: "500",
+    flex: 1,
   },
   modalSuccess: {
-    color: "#2E9C6A",
+    color: "#50E3C2",
     fontSize: 14,
+    fontWeight: "500",
+    flex: 1,
   },
   modalActions: {
     flexDirection: "row",
     justifyContent: "flex-end",
-    gap: 12,
+    alignItems: "center",
+    gap: 8,
+    marginTop: 4,
   },
   modalSecondary: {
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: 12,
-    backgroundColor: "rgba(12,27,51,0.08)",
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    borderWidth: 1.5,
+    borderColor: "rgba(255, 255, 255, 0.3)",
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 44,
+    flex: 1,
+    maxWidth: "48%",
   },
   modalSecondaryLabel: {
-    color: "#0C1B33",
+    color: "#FFFFFF",
     fontWeight: "600",
+    fontSize: 14,
   },
   modalPrimary: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: 12,
-    backgroundColor: "#0C1B33",
+    backgroundColor: "rgba(80, 227, 194, 0.3)",
+    borderWidth: 1.5,
+    borderColor: "rgba(80, 227, 194, 0.6)",
+    shadowColor: "rgba(80, 227, 194, 0.6)",
+    shadowOffset: {
+      width: 0,
+      height: 0,
+    },
+    shadowOpacity: 0.8,
+    shadowRadius: 2,
+    elevation: 0,
+    minHeight: 44,
+    flex: 1,
+    maxWidth: "48%",
   },
   modalPrimaryLabel: {
-    color: "#FFFFFF",
-    fontWeight: "600",
+    color: "#50E3C2",
+    fontWeight: "700",
+    fontSize: 14,
+    letterSpacing: 0.1,
+    flexShrink: 1,
+  },
+  modalButtonPressed: {
+    opacity: 0.7,
+    transform: [{ scale: 0.97 }],
   },
   invitationsCard: {
     backgroundColor: "rgba(255,255,255,0.04)",
